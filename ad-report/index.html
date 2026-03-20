@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ChillPark Ad Report</title>
+    <meta
+      name="description"
+      content="Redirects ChillPark ad reports to the public GitHub issue tracker."
+    >
+    <link rel="stylesheet" href="/styles.css">
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const source = new URL(window.location.href);
+        const target = new URL("https://github.com/paulpaul199722/FindParking/issues/new");
+
+        source.searchParams.forEach((value, key) => {
+          target.searchParams.append(key, value);
+        });
+
+        const manualLink = document.getElementById("manual-link");
+        if (manualLink) {
+          manualLink.href = target.toString();
+          manualLink.textContent = target.toString();
+        }
+
+        window.location.replace(target.toString());
+      });
+    </script>
+  </head>
+  <body>
+    <div class="shell">
+      <main class="card">
+        <nav class="top-nav" aria-label="Site">
+          <a href="/">Home</a>
+          <a href="/support/">Support</a>
+          <a href="/privacy-policy/">Privacy Policy</a>
+          <a href="/app-ads.txt">app-ads.txt</a>
+        </nav>
+
+        <span class="eyebrow">Ad Report</span>
+        <h1>Redirecting your report</h1>
+        <p>
+          ChillPark opens the public GitHub issue tracker for ad reports so we can review the
+          report details you submit.
+        </p>
+        <p>
+          If the redirect does not happen automatically, continue here:
+        </p>
+        <p>
+          <a id="manual-link" href="https://github.com/paulpaul199722/FindParking/issues/new">
+            https://github.com/paulpaul199722/FindParking/issues/new
+          </a>
+        </p>
+      </main>
+    </div>
+  </body>
+</html>
