@@ -61,6 +61,7 @@ header p{margin:6px 0 0;color:var(--muted)}
 .notes{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;font-size:.9rem}
 .notes ul{margin:8px 0 0;padding-left:1.2em;display:grid;gap:6px}
 .foot{font-size:.8rem;color:var(--muted)}
+.foot.is-error{color:var(--late);font-weight:700}
 @media (max-width:420px){.slot{grid-template-columns:68px 1fr}}
 </style>
 </head>
@@ -94,9 +95,10 @@ header p{margin:6px 0 0;color:var(--muted)}
     </ul>
   </section>
 
-  <p class="foot">剔咗嘅記錄淨係存喺你部機嘅瀏覽器，其他人睇唔到你剔咗乜。</p>
+  <p class="foot" id="sync" role="status">連緊資料庫…</p>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <script>
 const MEDS={B:["Bactigen","眼藥，左右眼"],A:["Antihist","1 粒"],C:["Cipro","1 粒"]};
 const DAYS=[
@@ -104,15 +106,30 @@ const DAYS=[
   {label:"第 2 日",date:"29/10",slots:[["29/10","08:00","B"],["29/10","13:00","BAC"],["29/10","19:00","BA"],["29/10","21:00","C"],["30/10","01:00","BA",1]]},
   {label:"第 3 日",date:"30/10",slots:[["30/10","08:00","B"],["30/10","13:00","BAC"],["30/10","19:00","BA"],["30/10","21:00","C"],["31/10","01:00","BA",1]]}
 ];
-const KEY="med-schedule-v1";
+const SUPABASE_URL="https://zwrnjqzagbepowsiwzyf.supabase.co";
+const SUPABASE_KEY="sb_publishable_H29ZE872GW5lh5jo41_m3w_9uiX-Ah1";
 const YEAR=new Date().getFullYear();
-let taken;
-try{taken=JSON.parse(localStorage.getItem(KEY))}catch(e){}
-if(!taken||typeof taken!=="object"){
-  // 28/10 1pm 已經食咗
-  taken={"28/10 13:00 B":1,"28/10 13:00 A":1,"28/10 13:00 C":1};
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let taken={}, loaded=false;
+function setSync(text,isError){const el=document.getElementById("sync");el.textContent=text;el.classList.toggle("is-error",!!isError)}
+async function load(){
+  const{data,error}=await db.from("doses").select("id");
+  if(error){setSync("連唔到資料庫，請重新整理頁面。",true);return}
+  taken=Object.fromEntries(data.map(r=>[r.id,1]));loaded=true;
+  setSync("已同步。所有開住呢條 link 嘅人都會見到一樣嘅剔。");render();
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(taken))}catch(e){}}
+async function toggle(key){
+  const was=!!taken[key];
+  if(was)delete taken[key];else taken[key]=1;
+  render();
+  const{error}=was?await db.from("doses").delete().eq("id",key):await db.from("doses").upsert({id:key},{onConflict:"id",ignoreDuplicates:true});
+  if(error){if(was)taken[key]=1;else delete taken[key];setSync("存唔到，請再撳一次。",true);render()}
+}
+db.channel("doses").on("postgres_changes",{event:"*",schema:"public",table:"doses"},p=>{
+  if(p.eventType==="DELETE")delete taken[p.old.id];else taken[p.new.id]=1;
+  render();
+}).subscribe(s=>{if(s==="SUBSCRIBED")load()});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)load()});
 function toDate(d,t){const[dd,mm]=d.split("/").map(Number);const[h,m]=t.split(":").map(Number);return new Date(YEAR,mm-1,dd,h,m)}
 function fmt(t){const h=+t.slice(0,2);return h===0?"12am":h<12?h+"am":h===12?"12pm":(h-12)+"pm"}
 function id(s,k){return s[0]+" "+s[1]+" "+k}
@@ -120,6 +137,7 @@ function slotDone(s){return [...s[2]].every(k=>taken[id(s,k)])}
 function all(){return DAYS.flatMap(d=>d.slots)}
 
 function render(){
+  if(!loaded){document.getElementById("next").innerHTML=`<div class="eyebrow">下一次</div><div class="what">載入緊…</div>`;return}
   const now=new Date();
   const next=all().find(s=>!slotDone(s));
   const nx=document.getElementById("next");
@@ -152,7 +170,7 @@ function render(){
         b.type="button";b.id="b-"+key.replace(/[^0-9A-Z]/g,"");
         b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",`${s[0]} ${fmt(s[1])} ${MEDS[k][0]} ${on?"已食":"未食"}`);
         b.textContent=on?"✓":"";
-        b.onclick=()=>{if(taken[key])delete taken[key];else taken[key]=1;save();render();document.getElementById(b.id)?.focus()};
+        b.onclick=()=>{toggle(key);document.getElementById(b.id)?.focus()};
         row.append(b);
         row.insertAdjacentHTML("beforeend",`<div><span class="name">${MEDS[k][0]}</span> <span class="dose">${MEDS[k][1]}</span></div>`);
         items.append(row);
