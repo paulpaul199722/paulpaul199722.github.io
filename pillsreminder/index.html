@@ -88,10 +88,9 @@ header p{margin:6px 0 0;color:var(--muted)}
   <section class="notes">
     <h2>要注意</h2>
     <ul>
-      <li>Anapar 唔使定時食，痛或者發燒先食，每日最多 3 次。可以夾埋 1pm、7pm 或者 1am 一齊食。</li>
-      <li>Cipro 張紙寫「隔 8 小時」，通常係隔 12 小時，最好打去診所確認。</li>
+      <li>Anapar 唔使定時食，痛或者發燒先食，每日最多 3 次。</li>
       <li>食 Cipro 前後 2 小時唔好飲奶、食鈣片或者胃藥。</li>
-      <li>呢啲藥會令人眼瞓，唔好揸車，唔好飲酒。</li>
+      <li>呢啲藥會令人眼瞓。</li>
     </ul>
   </section>
 
@@ -116,7 +115,7 @@ async function load(){
   const{data,error}=await db.from("doses").select("id");
   if(error){setSync("連唔到資料庫，請重新整理頁面。",true);return}
   taken=Object.fromEntries(data.map(r=>[r.id,1]));loaded=true;
-  setSync("已同步。所有開住呢條 link 嘅人都會見到一樣嘅剔。");render();
+  setSync("");render();
 }
 async function toggle(key){
   const was=!!taken[key];
