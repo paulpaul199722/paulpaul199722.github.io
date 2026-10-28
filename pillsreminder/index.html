@@ -128,7 +128,11 @@ async function toggle(key){
 db.channel("doses").on("postgres_changes",{event:"*",schema:"public",table:"doses"},p=>{
   if(p.eventType==="DELETE")delete taken[p.old.id];else taken[p.new.id]=1;
   render();
-}).subscribe(s=>{if(s==="SUBSCRIBED")load()});
+}).subscribe(s=>{
+  if(s==="SUBSCRIBED")load();
+  else if(s==="CHANNEL_ERROR"||s==="TIMED_OUT")setSync("即時更新斷咗，重新整理頁面先會見到其他人嘅剔。",true);
+});
+load();
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)load()});
 function toDate(d,t){const[dd,mm]=d.split("/").map(Number);const[h,m]=t.split(":").map(Number);return new Date(YEAR,mm-1,dd,h,m)}
 function fmt(t){const h=+t.slice(0,2);return h===0?"12am":h<12?h+"am":h===12?"12pm":(h-12)+"pm"}
