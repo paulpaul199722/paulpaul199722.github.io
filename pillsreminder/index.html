@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三日食藥表</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@400;500;700&family=Caveat:wght@600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column like a pharmacy bag label. Next dose on top, the four drugs, then each day as rows of dose slots. */
+:root{
+  --paper:#eef2f6; --card:#ffffff; --ink:#18212d; --muted:#5b6878; --line:#d3dbe4;
+  --pen:#2350b8; --pen-soft:#e4ebfa; --ok:#2c7a4b; --ok-soft:#e2f1e7; --late:#b0451c;
+  --f-body:"Noto Sans HK","PingFang HK","Microsoft JhengHei",system-ui,sans-serif;
+  --f-pen:"Caveat","Bradley Hand","Comic Sans MS",cursive;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#11161d; --card:#1a212b; --ink:#e6ebf1; --muted:#9aa7b6; --line:#2e3946;
+  --pen:#8fb0ff; --pen-soft:#1f2b45; --ok:#6fcf97; --ok-soft:#183026; --late:#ff9a6e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#11161d; --card:#1a212b; --ink:#e6ebf1; --muted:#9aa7b6; --line:#2e3946;
+  --pen:#8fb0ff; --pen-soft:#1f2b45; --ok:#6fcf97; --ok-soft:#183026; --late:#ff9a6e; color-scheme:dark}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55}
+.wrap{max-width:640px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+h1{font-size:1.6rem;margin:0;line-height:1.25;text-wrap:balance}
+h2{font-size:1.05rem;margin:0;text-wrap:balance}
+.eyebrow{font-size:.75rem;letter-spacing:.08em;color:var(--muted)}
+header p{margin:6px 0 0;color:var(--muted)}
+.next{background:var(--pen);color:var(--card);border-radius:14px;padding:18px 20px;display:grid;gap:4px}
+.next .eyebrow{color:inherit;opacity:.85}
+.next .when{font-family:var(--f-num);font-size:2rem;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums}
+.next .when small{font-family:var(--f-body);font-size:1rem;font-weight:500}
+.next .what{font-size:1.05rem;font-weight:500}
+.next .rel{font-size:.9rem;opacity:.9}
+.meds{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.med{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0;font-size:.9rem}
+.med .drug{font-family:var(--f-pen);font-size:1.65rem;color:var(--pen);line-height:1.1}
+.med .rule{font-size:.8rem;color:var(--muted)}
+.days{display:grid;gap:28px}
+.day{display:grid;gap:10px}
+.day-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.count{font-family:var(--f-num);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.slot{display:grid;grid-template-columns:84px 1fr;gap:12px;align-items:start;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.slot.is-done{background:var(--ok-soft);border-color:transparent}
+.slot.is-late{border-color:var(--late)}
+.slot.is-next{border-color:var(--pen);box-shadow:0 0 0 2px var(--pen-soft)}
+.time{font-family:var(--f-num);font-weight:600;font-size:1.1rem;font-variant-numeric:tabular-nums}
+.sub{font-size:.75rem;color:var(--muted)}
+.tag{display:inline-block;font-size:.72rem;padding:1px 8px;border-radius:99px;background:var(--pen-soft);color:var(--pen);margin-top:2px}
+.state{font-size:.75rem;font-weight:700;margin-top:2px}
+.is-done .state{color:var(--ok)}
+.is-late .state{color:var(--late)}
+.items{display:grid;gap:8px;min-width:0}
+.item{display:flex;align-items:center;gap:10px;min-width:0}
+.item button{flex:none;width:30px;height:30px;border-radius:8px;border:2px solid var(--line);background:var(--card);color:var(--ok);font-size:1.1rem;font-weight:700;cursor:pointer;display:grid;place-items:center}
+.item button[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:var(--card)}
+.item button:focus-visible{outline:3px solid var(--pen);outline-offset:2px}
+.item .name{font-weight:500}
+.item .dose{color:var(--muted);font-size:.85rem}
+.item.taken .name{text-decoration:line-through;text-decoration-color:var(--ok)}
+.notes{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;font-size:.9rem}
+.notes ul{margin:8px 0 0;padding-left:1.2em;display:grid;gap:6px}
+.foot{font-size:.8rem;color:var(--muted)}
+@media (max-width:420px){.slot{grid-template-columns:68px 1fr}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">28/10 – 30/10 · 三日份</div>
+    <h1>三日食藥表</h1>
+    <p>1am 至 8am 訓覺時間唔使食。食完撳格仔剔低。</p>
+  </header>
+
+  <section class="next" id="next" aria-live="polite"></section>
+
+  <section class="meds" aria-label="藥物">
+    <div class="med"><div class="drug">Bactigen</div>眼藥，左右眼<div class="rule">每日 4 次</div></div>
+    <div class="med"><div class="drug">Antihist 4mg</div>鼻水 / 敏感，1 粒<div class="rule">每日 3 次，隔 6 小時</div></div>
+    <div class="med"><div class="drug">Cipro 250mg</div>抗生素，1 粒<div class="rule">每日 2 次，隔 8 小時，要食晒</div></div>
+    <div class="med"><div class="drug">Anapar</div>止痛 / 退燒，1–2 粒<div class="rule">需要時先食，最少隔 6 小時</div></div>
+  </section>
+
+  <div class="days" id="days"></div>
+
+  <section class="notes">
+    <h2>要注意</h2>
+    <ul>
+      <li>Anapar 唔使定時食，痛或者發燒先食，每日最多 3 次。可以夾埋 1pm、7pm 或者 1am 一齊食。</li>
+      <li>Cipro 張紙寫「隔 8 小時」，通常係隔 12 小時，最好打去診所確認。</li>
+      <li>食 Cipro 前後 2 小時唔好飲奶、食鈣片或者胃藥。</li>
+      <li>呢啲藥會令人眼瞓，唔好揸車，唔好飲酒。</li>
+    </ul>
+  </section>
+
+  <p class="foot">剔咗嘅記錄淨係存喺你部機嘅瀏覽器，其他人睇唔到你剔咗乜。</p>
+</div>
+
+<script>
+const MEDS={B:["Bactigen","眼藥，左右眼"],A:["Antihist","1 粒"],C:["Cipro","1 粒"]};
+const DAYS=[
+  {label:"第 1 日",date:"28/10",slots:[["28/10","13:00","BAC"],["28/10","19:00","BA"],["28/10","21:00","C"],["29/10","01:00","BA",1]]},
+  {label:"第 2 日",date:"29/10",slots:[["29/10","08:00","B"],["29/10","13:00","BAC"],["29/10","19:00","BA"],["29/10","21:00","C"],["30/10","01:00","BA",1]]},
+  {label:"第 3 日",date:"30/10",slots:[["30/10","08:00","B"],["30/10","13:00","BAC"],["30/10","19:00","BA"],["30/10","21:00","C"],["31/10","01:00","BA",1]]}
+];
+const KEY="med-schedule-v1";
+const YEAR=new Date().getFullYear();
+let taken;
+try{taken=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!taken||typeof taken!=="object"){
+  // 28/10 1pm 已經食咗
+  taken={"28/10 13:00 B":1,"28/10 13:00 A":1,"28/10 13:00 C":1};
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(taken))}catch(e){}}
+function toDate(d,t){const[dd,mm]=d.split("/").map(Number);const[h,m]=t.split(":").map(Number);return new Date(YEAR,mm-1,dd,h,m)}
+function fmt(t){const h=+t.slice(0,2);return h===0?"12am":h<12?h+"am":h===12?"12pm":(h-12)+"pm"}
+function id(s,k){return s[0]+" "+s[1]+" "+k}
+function slotDone(s){return [...s[2]].every(k=>taken[id(s,k)])}
+function all(){return DAYS.flatMap(d=>d.slots)}
+
+function render(){
+  const now=new Date();
+  const next=all().find(s=>!slotDone(s));
+  const nx=document.getElementById("next");
+  if(next){
+    const when=toDate(next[0],next[1]);
+    const mins=Math.round((when-now)/60000);
+    const rel=mins>=60?`仲有 ${Math.floor(mins/60)} 小時 ${mins%60} 分鐘`:mins>=0?`仲有 ${mins} 分鐘`:`已經遲咗 ${Math.floor(-mins/60)} 小時 ${(-mins)%60} 分鐘`;
+    const left=[...next[2]].filter(k=>!taken[id(next,k)]).map(k=>MEDS[k][0]).join("、");
+    nx.innerHTML=`<div class="eyebrow">下一次</div><div class="when">${fmt(next[1])} <small>${next[0]}${next[3]?" · 訓前":""}</small></div><div class="what">${left}</div><div class="rel">${rel}</div>`;
+  }else{
+    nx.innerHTML=`<div class="eyebrow">完成</div><div class="when">三日藥食晒</div><div class="rel">Bactigen 眼藥如果仲有，跟醫生指示繼續用。</div>`;
+  }
+  const box=document.getElementById("days");
+  box.innerHTML="";
+  DAYS.forEach(day=>{
+    const n=day.slots.reduce((a,s)=>a+[...s[2]].length,0);
+    const done=day.slots.reduce((a,s)=>a+[...s[2]].filter(k=>taken[id(s,k)]).length,0);
+    const sec=document.createElement("section");sec.className="day";
+    sec.innerHTML=`<div class="day-head"><h2>${day.label} · ${day.date}</h2><span class="count">${done}/${n}</span></div>`;
+    day.slots.forEach(s=>{
+      const isDone=slotDone(s), late=!isDone&&toDate(s[0],s[1])<now;
+      const el=document.createElement("div");
+      el.className="slot"+(isDone?" is-done":late?" is-late":"")+(s===next&&!late?" is-next":"");
+      el.innerHTML=`<div><div class="time">${fmt(s[1])}</div><div class="sub">${s[0]}</div>${s[3]?'<span class="tag">訓前</span>':""}${isDone?'<div class="state">已食</div>':late?'<div class="state">未食</div>':""}</div><div class="items"></div>`;
+      const items=el.querySelector(".items");
+      [...s[2]].forEach(k=>{
+        const key=id(s,k), on=!!taken[key];
+        const row=document.createElement("div");row.className="item"+(on?" taken":"");
+        const b=document.createElement("button");
+        b.type="button";b.id="b-"+key.replace(/[^0-9A-Z]/g,"");
+        b.setAttribute("aria-pressed",on);b.setAttribute("aria-label",`${s[0]} ${fmt(s[1])} ${MEDS[k][0]} ${on?"已食":"未食"}`);
+        b.textContent=on?"✓":"";
+        b.onclick=()=>{if(taken[key])delete taken[key];else taken[key]=1;save();render();document.getElementById(b.id)?.focus()};
+        row.append(b);
+        row.insertAdjacentHTML("beforeend",`<div><span class="name">${MEDS[k][0]}</span> <span class="dose">${MEDS[k][1]}</span></div>`);
+        items.append(row);
+      });
+      box.append(el);
+    });
+  });
+}
+render();
+setInterval(render,60000);
+</script>
+</body>
+</html>
