@@ -97,7 +97,7 @@ header p{margin:4px 0 0;color:var(--muted)}
     <div class="med"><div class="drug">Bactigen</div>眼藥，左右眼<div class="rule">每日 4 次</div></div>
     <div class="med"><div class="drug">Antihist 4mg</div>鼻水，1 粒<div class="rule">每日 3 次，隔 6 小時</div></div>
     <div class="med"><div class="drug">Cipro 250mg</div>抗生素，1 粒<div class="rule">每日 2 次，隔 8 小時，食 4 日</div></div>
-    <div class="med"><div class="drug">Anapar</div>止痛，1–2 粒<div class="rule">需要時先食，最少隔 6 小時</div></div>
+    <div class="med"><div class="drug">Anapar</div>止痛，1–2 粒<div class="rule">每日 3 次，隔 6 小時，唔痛可以唔食</div></div>
   </section>
 
   <div class="days" id="days"></div>
@@ -106,7 +106,7 @@ header p{margin:4px 0 0;color:var(--muted)}
     <div>
       <h2>要注意</h2>
       <ul>
-        <li>Anapar 唔使定時食，痛先食，每日最多 3 次。</li>
+        <li>Anapar 跟 Antihist 一齊食。唔痛嗰次可以唔食，唔剔都得，每日最多 3 次。</li>
         <li>胃藥、鈣片、鐵或者鋅要喺食完 Cipro 2 小時後先食。如果已經食咗，要等 6 小時先食 Cipro。唔好用奶或者乳酪送 Cipro。</li>
         <li>Antihist 會令人眼瞓。</li>
       </ul>
@@ -119,12 +119,12 @@ header p{margin:4px 0 0;color:var(--muted)}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <script>
-const MEDS={B:["Bactigen","眼藥，左右眼"],A:["Antihist","1 粒"],C:["Cipro","1 粒"]};
+const MEDS={B:["Bactigen","眼藥，左右眼"],A:["Antihist","1 粒"],C:["Cipro","1 粒"],P:["Anapar","1–2 粒"]};
 const DAYS=[
-  {label:"第 1 日",date:"28/10",slots:[["28/10","13:00","BAC"],["28/10","19:00","BA"],["28/10","21:00","C"],["29/10","01:00","BA",1]]},
-  {label:"第 2 日",date:"29/10",slots:[["29/10","08:00","B"],["29/10","13:00","BAC"],["29/10","19:00","BA"],["29/10","21:00","C"],["30/10","01:00","BA",1]]},
-  {label:"第 3 日",date:"30/10",slots:[["30/10","08:00","B"],["30/10","13:00","BAC"],["30/10","19:00","BA"],["30/10","21:00","C"],["31/10","01:00","BA",1]]},
-  {label:"第 4 日",date:"31/10",slots:[["31/10","08:00","B"],["31/10","13:00","BAC"],["31/10","19:00","BA"],["31/10","21:00","C"],["1/11","01:00","BA",1]]},
+  {label:"第 1 日",date:"28/10",slots:[["28/10","13:00","BACP"],["28/10","19:00","BAP"],["28/10","21:00","C"],["29/10","01:00","BAP",1]]},
+  {label:"第 2 日",date:"29/10",slots:[["29/10","08:00","B"],["29/10","13:00","BACP"],["29/10","19:00","BAP"],["29/10","21:00","C"],["30/10","01:00","BAP",1]]},
+  {label:"第 3 日",date:"30/10",slots:[["30/10","08:00","B"],["30/10","13:00","BACP"],["30/10","19:00","BAP"],["30/10","21:00","C"],["31/10","01:00","BAP",1]]},
+  {label:"第 4 日",date:"31/10",slots:[["31/10","08:00","B"],["31/10","13:00","BACP"],["31/10","19:00","BAP"],["31/10","21:00","C"],["1/11","01:00","BAP",1]]},
   {label:"最後一次",date:"1/11",slots:[["1/11","08:00","B"]]}
 ];
 const SUPABASE_URL="https://zwrnjqzagbepowsiwzyf.supabase.co";
@@ -158,7 +158,8 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden)load()});
 function toDate(d,t){const[dd,mm]=d.split("/").map(Number);const[h,m]=t.split(":").map(Number);return new Date(YEAR,mm-1,dd,h,m)}
 function fmt(t){const h=+t.slice(0,2);return h===0?"12am":h<12?h+"am":h===12?"12pm":(h-12)+"pm"}
 function id(s,k){return s[0]+" "+s[1]+" "+k}
-function slotDone(s){return [...s[2]].every(k=>taken[id(s,k)])}
+// Anapar can be skipped when there's no pain, so it doesn't hold a slot open.
+function slotDone(s){return [...s[2]].filter(k=>k!=="P").every(k=>taken[id(s,k)])}
 function all(){return DAYS.flatMap(d=>d.slots)}
 // Swap the next-dose bear only when its mood changes, so the animation doesn't restart every render.
 function setBear(m){
