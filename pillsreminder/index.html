@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>三日食藥表</title>
+<title>四日食藥表</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&display=swap">
 <style>
 /* Layout: one narrow column of hand-drawn sticker cards. The bear waves in the header, waits in the next-dose card and dozes beside the notes. */
@@ -82,8 +82,8 @@ header p{margin:4px 0 0;color:var(--muted)}
   <header>
     <picture class="bear"><source srcset="img/hello-still.webp" media="(prefers-reduced-motion: reduce)"><img src="img/hello.webp" alt="" width="360" height="360"></picture>
     <div>
-      <div class="eyebrow">28/10 – 30/10 · 三日份</div>
-      <h1>三日食藥表</h1>
+      <div class="eyebrow">28/10 – 1/11</div>
+      <h1>四日食藥表</h1>
       <p>1am 至 8am 訓覺時間唔使食。食完撳格仔剔低。</p>
     </div>
   </header>
@@ -95,9 +95,9 @@ header p{margin:4px 0 0;color:var(--muted)}
 
   <section class="meds" aria-label="藥物">
     <div class="med"><div class="drug">Bactigen</div>眼藥，左右眼<div class="rule">每日 4 次</div></div>
-    <div class="med"><div class="drug">Antihist 4mg</div>鼻水 / 敏感，1 粒<div class="rule">每日 3 次，隔 6 小時</div></div>
-    <div class="med"><div class="drug">Cipro 250mg</div>抗生素，1 粒<div class="rule">每日 2 次，隔 8 小時，要食晒</div></div>
-    <div class="med"><div class="drug">Anapar</div>止痛 / 退燒，1–2 粒<div class="rule">需要時先食，最少隔 6 小時</div></div>
+    <div class="med"><div class="drug">Antihist 4mg</div>鼻水，1 粒<div class="rule">每日 3 次，隔 6 小時</div></div>
+    <div class="med"><div class="drug">Cipro 250mg</div>抗生素，1 粒<div class="rule">每日 2 次，隔 8 小時，食 4 日</div></div>
+    <div class="med"><div class="drug">Anapar</div>止痛，1–2 粒<div class="rule">需要時先食，最少隔 6 小時</div></div>
   </section>
 
   <div class="days" id="days"></div>
@@ -106,9 +106,9 @@ header p{margin:4px 0 0;color:var(--muted)}
     <div>
       <h2>要注意</h2>
       <ul>
-        <li>Anapar 唔使定時食，痛或者發燒先食，每日最多 3 次。</li>
-        <li>食 Cipro 前後 2 小時唔好飲奶、食鈣片或者胃藥。</li>
-        <li>呢啲藥會令人眼瞓。</li>
+        <li>Anapar 唔使定時食，痛先食，每日最多 3 次。</li>
+        <li>胃藥、鈣片、鐵或者鋅要喺食完 Cipro 2 小時後先食。如果已經食咗，要等 6 小時先食 Cipro。唔好用奶或者乳酪送 Cipro。</li>
+        <li>Antihist 會令人眼瞓。</li>
       </ul>
     </div>
     <picture class="bear"><source srcset="img/sleepy-still.webp" media="(prefers-reduced-motion: reduce)"><img src="img/sleepy.webp" alt="" width="360" height="360"></picture>
@@ -123,7 +123,9 @@ const MEDS={B:["Bactigen","眼藥，左右眼"],A:["Antihist","1 粒"],C:["Cipro
 const DAYS=[
   {label:"第 1 日",date:"28/10",slots:[["28/10","13:00","BAC"],["28/10","19:00","BA"],["28/10","21:00","C"],["29/10","01:00","BA",1]]},
   {label:"第 2 日",date:"29/10",slots:[["29/10","08:00","B"],["29/10","13:00","BAC"],["29/10","19:00","BA"],["29/10","21:00","C"],["30/10","01:00","BA",1]]},
-  {label:"第 3 日",date:"30/10",slots:[["30/10","08:00","B"],["30/10","13:00","BAC"],["30/10","19:00","BA"],["30/10","21:00","C"],["31/10","01:00","BA",1]]}
+  {label:"第 3 日",date:"30/10",slots:[["30/10","08:00","B"],["30/10","13:00","BAC"],["30/10","19:00","BA"],["30/10","21:00","C"],["31/10","01:00","BA",1]]},
+  {label:"第 4 日",date:"31/10",slots:[["31/10","08:00","B"],["31/10","13:00","BAC"],["31/10","19:00","BA"],["31/10","21:00","C"],["1/11","01:00","BA",1]]},
+  {label:"最後一次",date:"1/11",slots:[["1/11","08:00","B"]]}
 ];
 const SUPABASE_URL="https://zwrnjqzagbepowsiwzyf.supabase.co";
 const SUPABASE_KEY="sb_publishable_H29ZE872GW5lh5jo41_m3w_9uiX-Ah1";
@@ -181,7 +183,7 @@ function render(){
     nx.innerHTML=`<div class="eyebrow">下一次</div><div class="when">${fmt(next[1])} <small>${next[0]}${next[3]?" · 訓前":""}</small></div><div class="what">${left}</div><div class="rel">${rel}</div>`;
   }else{
     setBear("best");
-    nx.innerHTML=`<div class="eyebrow">完成</div><div class="when">三日藥食晒</div><div class="rel">Bactigen 眼藥如果仲有，跟醫生指示繼續用。</div>`;
+    nx.innerHTML=`<div class="eyebrow">完成</div><div class="when">全部藥食晒</div><div class="rel">Bactigen 眼藥如果仲有，跟醫生指示繼續用。</div>`;
   }
   const box=document.getElementById("days");
   box.innerHTML="";
