@@ -1,0 +1,126 @@
+{
+  "skill_name": "agent-skills-creator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Improve our deploy-checklist skill. It's nearly 200 lines and people say it's too long. Here's the folder.",
+      "expected_output": "A shorter skill that keeps the deployment contracts (freeze window, migration plan, payments drain, canary thresholds, rollback) and drops the generic coaching, with the duplicated rollback steps reduced to one copy, the conflicting canary hold times surfaced, line counts before and after, and a plain statement that behaviour was not measured.",
+      "files": [],
+      "fixture": "evals/fixtures/long-deploy-checklist",
+      "assertions": [
+        "Reports the SKILL.md line count both before and after the edit",
+        "States that the shortened skill's behaviour was not measured by running it",
+        "Reports keeping the production freeze window rule",
+        "Reports cutting generic advice that is not specific to this repository's deploys",
+        "Reports that the rollback steps were duplicated between SKILL.md and references/rollback.md",
+        "Reports that the skill stated two different canary hold times (20 minutes and 10 minutes)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write a skill that reviews screenshots of our checkout for visual regressions and then generates a corrected mockup image for the designer.",
+      "expected_output": "A skill whose body hands the screenshot to the model directly rather than instructing a describe-then-reason step, and which routes the mockup generation to the inkwell image tool the repository already configures, with an explicit path for when that tool is absent, because image input is universal across current frontier models and image output is not.",
+      "files": [],
+      "fixture": "evals/fixtures/checkout-screenshot-skill",
+      "assertions": [
+        "Does not instruct the model to describe or transcribe the screenshot as an intermediate step",
+        "Names the inkwell image tool that this repository already configures for generating the mockup",
+        "States what the new skill does when the image tool is unavailable",
+        "Does not assume the invoking model can emit an image directly",
+        "States what the new skill requires from its host before its first step",
+        "States the new skill's description or its Use when trigger phrases"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "My skill works great in Claude Code but does nothing useful when a teammate runs it from Cursor, and it broke the claude.ai upload. Here it is.",
+      "expected_output": "A diagnosis that separates the two failures by their shared cause: Claude Code-only frontmatter and ${CLAUDE_*} substitutions degrade silently on Cursor and hard-error on a claude.ai upload from the same lines, plus a check of whether the body assumes a shell or a repo that a browser host cannot supply, and a fix that keeps the six spec fields and states preconditions in the body.",
+      "files": [],
+      "fixture": "evals/fixtures/claude-only-frontmatter",
+      "assertions": [
+        "Names Claude Code-only frontmatter fields that the skill's SKILL.md contains (such as context, agent, argument-hint, or disable-model-invocation)",
+        "Explains that a host other than Claude Code may ignore those fields",
+        "Attributes the claude.ai upload failure to those fields (a hedged attribution counts)",
+        "Reports the ${CLAUDE_SKILL_DIR} path in the body as text that other agents leave unexpanded",
+        "Reports that the skill never stated it needs a git repository",
+        "Reports adding a stated precondition for the shell and git requirement",
+        "Makes one portable skill the fix, and mentions a Claude Code-only copy only as an optional trade-off, if at all"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Update all skills for new frontier models. The vendor announcement says coding and judgement improved. No cross-model evaluation runner is connected.",
+      "expected_output": "Updates retention guidance first, audits every skill with a ledger, removes generic coaching, retains task contracts, and explicitly marks cross-model behavior untested.",
+      "files": [],
+      "fixture": "evals/fixtures/frontier-model-refresh",
+      "assertions": [
+        "Does not infer training contents or passing model evaluations from the announcement",
+        "Gives a keep, cut, merge, or retire decision for each of the four skills by name",
+        "Reports that tidy-comments holds only generic advice with nothing specific to this repository",
+        "Does not delete an operational security contract on benchmark reputation alone",
+        "Distinguishes authored scenarios from executed tests"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "We have 9 skills installed and Codex has started truncating the descriptions. It keeps loading the database skill for anything that mentions a model. Fix the routing.",
+      "expected_output": "Reads every description as one listing, shortens descriptions instead of adding trigger words, replaces domain-noun category lists with the moment of use, gives the database skill and the model-facing skills it collides with a For X use Y edge, and lists should-trigger and near-miss prompts while saying routing was not measured with a model run. Bodies are untouched.",
+      "files": [],
+      "fixture": "evals/fixtures/crowded-skill-listing",
+      "assertions": [
+        "Reports the combined length of all nine descriptions before the change",
+        "Reports a lower combined description length after the change",
+        "Quotes the database skill's new description",
+        "Reports that the database skill and each skill it collided with gained a clause pointing at the other",
+        "Lists near-miss prompts that mention a model but belong to a skill other than database",
+        "States that routing was not measured by running a model against the listing",
+        "Reports leaving the SKILL.md bodies unchanged"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Our feature-implementation skill used to run a task to completion. Since we upgraded the model it does the first cut, writes a summary, and asks us to review before it will run the tests or fix anything. Here's the skill.",
+      "expected_output": "Locates the stop-for-review step and any blanket confirmation language, decides for each whether the decision is genuinely the user's, removes the ones that are not, and replaces them with a stated scope of done, completion evidence, and an explicit grant for the local test loop with the reason it is safe. Does not add step-by-step instructions to compensate.",
+      "files": [],
+      "fixture": "evals/fixtures/stops-for-review",
+      "assertions": [
+        "Identifies Step 4 as the instruction that stops the work for review after the first implementation",
+        "Reports removing or narrowing the blanket rule to confirm before running any command",
+        "Reports keeping the approval requirement for the shared-database migration",
+        "Reports adding a statement of what done means that includes running the tests",
+        "Reports that the skill now explicitly permits running the local checks without asking",
+        "Gives the reason the local test run is safe (it uses a throwaway local database, not the shared one)",
+        "Does not add a new checklist or step list to compensate for the removed pause"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "I hillclimbed our code-review skill for two rounds. Train pass rate went from 71% to 89%, test stayed at 73%. I want to merge the edits, they clearly help.",
+      "expected_output": "Flags this as overfitting to the train split, not a win: train rose while test stayed flat, which is the named revert condition in the hillclimb loop. Recommends reverting the edits rather than merging, checks whether the test movement is inside the measured noise floor before drawing any conclusion from it, and does not treat the train number as evidence on its own.",
+      "files": [],
+      "assertions": [
+        "States plainly that train improving while test is flat is overfitting and the defined revert condition, not a result to ship",
+        "Recommends reverting the edits rather than merging them",
+        "Asks whether the test score's movement is within the measured noise floor before calling it a change at all",
+        "Does not cite the 89% train figure as evidence the edits help",
+        "Does not propose a third round on the same train failures without first diagnosing why train and test diverged"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Audit all our skills for duplication and dead weight; several repeat the same tells list and one keeps a sources file in references/.",
+      "expected_output": "A module-lens collection audit: a deletion test per section, the tells list given one owner with the copies turned into pointers and the drifted copy called out, the never-loaded sources file moved out of references/, and the security and data-integrity rules kept.",
+      "files": [],
+      "fixture": "evals/fixtures/duplicated-tells-list",
+      "assertions": [
+        "Names at least one specific section inside a skill as dead weight to cut",
+        "Names blog-drafts, release-notes, and support-replies as the three skills carrying the tells list",
+        "Reports that the support-replies copy of the tells list has drifted from the other two",
+        "Proposes or applies keeping the tells list in one place with the other skills pointing to it",
+        "Reports that references/sources.md in blog-drafts is never loaded by its SKILL.md",
+        "Proposes or applies moving sources.md out of references/ to a maintenance-only location",
+        "Reports keeping the incident-comms rule against publishing customer identifiers"
+      ]
+    }
+  ]
+}

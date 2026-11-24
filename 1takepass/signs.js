@@ -53,7 +53,44 @@
     warn_steep_down: { alt: "警告標誌：1:8 向下斜坡連低波行車字牌（第 67 頁）", page: 67, tall: true },
     warn_two_way_ahead: { alt: "發出警告標誌 #58：前面雙程行車（第 117 頁）", page: 117 },
     warn_two_way_cross: { alt: "發出警告標誌 #57：前面雙程行車路橫過單程路（第 117 頁）", page: 117 },
-    wind_affected: { alt: "發出指令標誌 #69：受風車輛不准駛入（第 113 頁）", page: 113, wide: true }
+    wind_affected: { alt: "發出指令標誌 #69：受風車輛不准駛入（第 113 頁）", page: 113, wide: true },
+    cycle_dismount: { alt: "發出指令標誌 #18：限制騎單車 — 必須下車（第 111 頁）", page: 111 },
+    cycle_track: { alt: "發出指令標誌 #15：單車或三輪車徑，禁止汽車駛入（第 111 頁）", page: 111 },
+    except_for_access: { alt: "發出指令輔助字牌 #54：前往此區者不在此限（第 112 頁）", page: 112 },
+    expressway_end: { alt: "發出指令標誌 #81：快速公路終止（第 113 頁）", page: 113 },
+    hand_signal_right: { alt: "駕駛人手號：右臂平伸向右轉或駛出（第 105 頁）", page: 105, wide: true },
+    height_limit_45: { alt: "發出指令標誌 #49：禁止超過所示高度的車輛駛入（第 112 頁）", page: 112 },
+    keep_left: { alt: "發出指令標誌 #4：靠左行駛（第 111 頁）", page: 111 },
+    lrt_tram_only: { alt: "發出指令標誌 #20：只限輕鐵車輛或電車駛入（第 111 頁）", page: 111, wide: true },
+    no_bicycles: { alt: "發出指令標誌 #44：禁止單車及三輪車進入（第 112 頁）", page: 112 },
+    no_dangerous_goods: { alt: "發出指令標誌 #72：禁止載有指定類別危險品的車輛駛入（第 113 頁）", page: 113 },
+    no_entry: { alt: "發出指令標誌 #9：所有車輛不准駛入（第 111 頁）", page: 111 },
+    no_lane_change: { alt: "發出指令標誌 #13：不准換線（第 111 頁）", page: 111, wide: true },
+    no_left_turn: { alt: "發出指令標誌 #40：不准左轉（第 112 頁）", page: 112 },
+    no_pedestrians: { alt: "發出指令標誌 #42：行人止步（第 112 頁）", page: 112 },
+    no_u_turn: { alt: "發出指令標誌 #41：不准掉頭（第 112 頁）", page: 112 },
+    passing_place: { alt: "提示標誌：讓車處（第 123 頁）", page: 123 },
+    police_stop: { alt: "發出指令標誌 #11：車輛須於標誌前停車（警方）（第 111 頁）", page: 111 },
+    speed_limit_50: { alt: "發出指令標誌 #52：速度限制 50 公里/小時（第 112 頁）", page: 112 },
+    tram_stop_mark: { alt: "指令道路標記：電車站黃色停車線（第 127 頁）", page: 127 },
+    tunnel_start: { alt: "發出指令標誌 #70：隧道區起點（第 113 頁）", page: 113, wide: true },
+    turn_left_ahead: { alt: "發出指令標誌 #6：前面路口左轉（第 111 頁）", page: 111 },
+    warn_children: { alt: "發出警告標誌 #39：前面有兒童（第 117 頁）", page: 117 },
+    warn_crossroads: { alt: "發出警告標誌 #25：前面有十字路口（第 116 頁）", page: 116 },
+    warn_cyclists: { alt: "發出警告標誌 #54：前面有騎單車者（第 117 頁）", page: 117 },
+    warn_disabled: { alt: "發出警告標誌 #34：前面有殘疾人士（第 117 頁）", page: 117 },
+    warn_loose_chippings: { alt: "臨時警告標誌 #34：前面有鬆脫碎石（第 120 頁）", page: 120 },
+    warn_lrt_tram: { alt: "發出警告標誌 #49：前面有輕鐵車輛或電車（第 117 頁）", page: 117 },
+    warn_narrow_both: { alt: "發出警告標誌 #10：前面道路兩邊收窄（第 116 頁）", page: 116 },
+    warn_ped_blackspot: { alt: "發出警告標誌 #24：前面有行人交通意外黑點（第 116 頁）", page: 116 },
+    warn_roadworks: { alt: "臨時警告標誌 #5：前面有道路工程（第 119 頁）", page: 119 },
+    warn_roundabout: { alt: "發出警告標誌 #8：前面有迴旋處（第 116 頁）", page: 116 },
+    warn_slippery: { alt: "臨時警告標誌 #33：前面路滑（第 120 頁）", page: 120 },
+    warn_traffic_lights: { alt: "發出警告標誌 #14：前面有交通燈號（第 116 頁）", page: 116 },
+    warn_zebra_ahead: { alt: "發出警告標誌 #38：前面有行人過路處（第 117 頁）", page: 117 },
+    weight_limit_10t: { alt: "發出指令標誌 #50：禁止超過所示總重量的車輛駛入（第 112 頁）", page: 112 },
+    yellow_box_normal: { alt: "指令道路標記：路口黃色方格標記（第 127 頁）", page: 127, tall: true },
+    zebra_crossing_mark: { alt: "指令道路標記：斑馬線、讓路線及之字線控制區（第 127 頁）", page: 127, tall: true }
   };
 
   const ASSETS = {};
@@ -77,6 +114,6 @@
       .filter(Boolean)
       .join(" ");
     const loading = eager ? "eager" : "lazy";
-    return `<img class="${cls}" src="${escAttr(item.src)}" alt="${escAttr(item.alt)}" loading="${loading}" decoding="async">`;
+    return `<img class="${cls}" src="${escAttr(item.src)}" alt="${escAttr(item.alt)}" data-sign-key="${escAttr(key)}" tabindex="0" role="button" aria-label="點擊放大查看圖片" loading="${loading}" decoding="async">`;
   };
 })();

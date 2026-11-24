@@ -1,0 +1,100 @@
+{
+  "skill_name": "planning",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Plan a CSV export using the existing export service. Just write the plan, no interview. Include cancellation and a way to verify partial output is not presented as complete.",
+      "expected_output": "Write a bounded plan from available evidence, with acceptance criteria.",
+      "files": [],
+      "assertions": [
+        "Does not push back for an interview",
+        "Names cancellation and partial-output checks",
+        "Does not implement source code for a plan-only request"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Review a plan that says proxy.ts handles authorization, while POST /api/export is excluded by its matcher. Fix the plan.",
+      "expected_output": "Correct the authorization location and verification criterion.",
+      "files": [],
+      "assertions": [
+        "Identifies the matcher-excluded path",
+        "Requires authorization at the handler or data boundary",
+        "Does not inflate a self-score by adding unrelated work"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Plan adding four filter props to the shared DataTable used across the app. This reporting feature will keep growing next month.",
+      "expected_output": "Measure the fork before recommending, ask about the growth hinge, and record the decision.",
+      "files": [
+        "evals/files/datatable/DataTable.tsx",
+        "evals/files/datatable/UsersPage.tsx",
+        "evals/files/datatable/InvoicesPage.tsx",
+        "evals/files/datatable/TeamsPage.tsx",
+        "evals/files/datatable/AuditLogPage.tsx",
+        "evals/files/datatable/ReportsPage.tsx"
+      ],
+      "assertions": [
+        "States that DataTable has five call sites in the supplied code",
+        "States what would flip the recommendation",
+        "Asks the user how far or in what direction the reporting feature will grow",
+        "Includes a decision entry for extending DataTable versus building a separate component that names who decides it",
+        "Marks that decision as proposed or awaiting the user's answer, not as already agreed"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Plan adding a --json flag to the export command. The repo's docs/README.md index marks docs/cli.md as Current and docs/history.md as Archived. Just write the plan.",
+      "expected_output": "A plan whose contract names docs/cli.md as a current doc this change makes wrong, updated in the same PR, and leaves the archived doc alone.",
+      "files": [],
+      "assertions": [
+        "Names docs/cli.md as a doc that changes in the same PR",
+        "Does not list docs/history.md as a doc to update",
+        "Does not add a line or size budget to the plan"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Split team-digest-plan.md into tickets we can hand out on Monday.",
+      "expected_output": "Three tickets cut by shippable outcome (the setting, the weekly email, the admin stats) rather than by layer, with the blocking order stated, a verification per ticket, and the sender address kept as an open item for marketing.",
+      "files": [
+        "evals/files/digest/team-digest-plan.md"
+      ],
+      "assertions": [
+        "Splits the tickets by outcome (digest setting, weekly email, admin stats) rather than by database, backend, and frontend",
+        "States that the weekly email ticket is blocked by the digest setting ticket",
+        "Gives every ticket its own acceptance or verification criterion",
+        "Keeps the sender address marked as undecided with marketing named as the party who supplies it",
+        "Does not present a launch date or deadline as known"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Stress-test reset-rate-limit-plan.md before I start on it tomorrow. The two files it touches are here too.",
+      "expected_output": "A review that checks the plan's claims against rateLimit.ts and resetRequest.ts, finds them true, and says the plan is ready without adding scope or rewriting it.",
+      "files": [
+        "evals/files/reset/reset-rate-limit-plan.md",
+        "evals/files/reset/rateLimit.ts",
+        "evals/files/reset/resetRequest.ts"
+      ],
+      "assertions": [
+        "Confirms that the rateLimit({ key, limit, windowSec }) signature in rateLimit.ts matches what the plan claims",
+        "Concludes the plan can be started without rework",
+        "Does not add CAPTCHA, account lockout, or a new datastore as a requirement",
+        "Does not return a rewritten copy of the whole plan"
+      ]
+    }
+  ],
+  "baseline": {
+    "date": "2026-10-09",
+    "method": "Case 4 only. Fresh general-purpose subagents (claude-opus-5-5) wrote a plan with and without the working-copy SKILL.md, two runs per arm, graded by hand. Run twice: once on the prompt alone, once on a small CLI fixture repo whose docs/README.md marks docs/cli.md Current and docs/history.md Archived, with the prompt cut to 'Plan adding a --json flag to tally export. Just write the plan.' and no mention of docs.",
+    "results": {
+      "4": {
+        "without_skill": "3/3, 3/3 (prompt); 3/3, 3/3 (fixture)",
+        "with_skill": "3/3, 3/3 (prompt); 3/3, 3/3 (fixture)",
+        "notes": "No headroom on this model: without the skill, both fixture runs read docs/README.md and planned the docs/cli.md update in the same change. The Docs bullet is a contract here, not a measured gain; a smaller model is the untested case."
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
-// 1TakePass — Core Engine, SVG Icon System, Leitner SRS & Supabase Cloud Sync
-// Hardened with mblode/agent-skills (ui-design, ui-animation, typography-audit, tidy)
+// 1TakePass — Core Engine, Leitner SRS & Supabase Cloud Sync
+// Streamlined with product-design, ui-design (Deslop), ui-ux-pro-max, and typography-audit
 (() => {
   "use strict";
 
@@ -15,45 +15,22 @@
     { cls: "b1", title: "新記憶", sub: "10 分鐘" },
     { cls: "b2", title: "鞏固中", sub: "1 天" },
     { cls: "b3", title: "熟手中", sub: "3–7 天" },
-    { cls: "b4", title: "已牢記", sub: "永久掌握" }
+    { cls: "b4", title: "已牢記", sub: "已掌握" }
   ];
 
-  // Uniform 24x24 geometric outline SVG icons (Zero emojis)
+  // Minimal 24x24 geometric outline SVG icons
   const svgIcon = (inner, cls = "ic") =>
     `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 
   const ICONS = {
-    home: svgIcon(`<path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/>`),
-    bookX: svgIcon(`<path d="M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="m10 8 4 4m0-4-4 4"/>`),
-    columns: svgIcon(`<rect x="3" y="4" width="7.5" height="16" rx="1.5"/><rect x="13.5" y="4" width="7.5" height="16" rx="1.5"/>`),
-    chart: svgIcon(`<path d="M4 20h16"/><path d="M7 16v-5"/><path d="M12 16V7"/><path d="M17 16v-8"/>`),
     play: svgIcon(`<polygon points="6 4 19 12 6 20 6 4"/>`),
-    refresh: svgIcon(`<path d="M20 12a8 8 0 1 1-2.3-5.6L20 8"/><path d="M20 4v4h-4"/>`),
-    alertTri: svgIcon(`<path d="M12 3 2.5 19.5h19L12 3Z"/><path d="M12 9.5v4"/><circle cx="12" cy="16.5" r="0.6" fill="currentColor"/>`),
-    fileText: svgIcon(`<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>`),
-    alertCircle: svgIcon(`<circle cx="12" cy="12" r="9.5"/><path d="M12 8v4.5"/><circle cx="12" cy="16" r="0.6" fill="currentColor"/>`),
-    target: svgIcon(`<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>`),
     chevLeft: svgIcon(`<path d="m15 18-6-6 6-6"/>`),
-    flame: svgIcon(`<path d="M12 3c2 3 6 5.5 6 10a6 6 0 1 1-12 0c0-2.5 1.3-4.6 3-6 0 2 1.2 3 2.5 3 .4-2.4-.5-5 .5-7Z"/>`),
+    chevDown: svgIcon(`<path d="m6 9 6 6 6-6"/>`),
     x: svgIcon(`<path d="M18 6 6 18M6 6l12 12"/>`),
     sun: svgIcon(`<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`),
     moon: svgIcon(`<path d="M20 14.5A8 8 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/>`),
     volOn: svgIcon(`<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/>`),
-    volOff: svgIcon(`<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="m22 9-6 6M16 9l6 6"/>`),
-    shield: svgIcon(`<path d="M12 3 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-3Z"/>`),
-    gauge: svgIcon(`<path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="m12 13 4-4"/>`),
-    route: svgIcon(`<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18h5a3.5 3.5 0 0 0 0-7h-3a3.5 3.5 0 0 1 0-7h5"/>`),
-    parking: svgIcon(`<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9.5 16V8h3a2.5 2.5 0 0 1 0 5h-3"/>`),
-    traffic: svgIcon(`<rect x="7" y="2.5" width="10" height="19" rx="3"/><circle cx="12" cy="7" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="17" r="1.6"/>`),
-    heart: svgIcon(`<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10Z"/>`),
-    checkCircle: svgIcon(`<circle cx="12" cy="12" r="9.5"/><path d="m8.5 12.2 2.3 2.3 4.8-5"/>`),
-    sparkles: svgIcon(`<path d="m12 3 1.8 4.8L18.5 9.5l-4.7 1.7L12 16l-1.8-4.8L5.5 9.5l4.7-1.7L12 3Z"/><path d="M19 16l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z"/>`),
-    book: svgIcon(`<path d="M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>`),
-    award: svgIcon(`<circle cx="12" cy="9" r="5.5"/><path d="m9 14-1.5 7L12 18.5 16.5 21 15 14"/>`),
-    zap: svgIcon(`<polygon points="13 2 4 14 11.5 14 10.5 22 20 10 12.5 10 13 2"/>`),
-    trophy: svgIcon(`<path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4v2a3 3 0 0 0 3 3"/><path d="M17 6h3v2a3 3 0 0 1-3 3"/><path d="M12 14v5M8 20h8"/>`),
-    crown: svgIcon(`<path d="M3 18h18l-1.5-10-4.5 4-3-6-3 6-4.5-4L3 18Z"/>`),
-    brain: svgIcon(`<path d="M9.5 4.5a3.5 3.5 0 0 0-3.5 3.5c0 .7.2 1.3.5 1.8A3.5 3.5 0 0 0 7 16.5a3 3 0 0 0 5 1.5V4.5a2.5 2.5 0 0 0-2.5 0Z"/><path d="M14.5 4.5A3.5 3.5 0 0 1 18 8c0 .7-.2 1.3-.5 1.8A3.5 3.5 0 0 1 17 16.5a3 3 0 0 1-5 1.5V4.5a2.5 2.5 0 0 1 2.5 0Z"/>`)
+    volOff: svgIcon(`<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="m22 9-6 6M16 9l6 6"/>`)
   };
 
   function hydrateIcons() {
@@ -78,7 +55,6 @@
   let session = null;
   let summaryFilter = "all";
   let mistakeFilter = "active";
-  let lastEmotionText = "";
   let noticeTimer = null;
   let lastFocusedEl = null;
 
@@ -91,7 +67,26 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
 
-  // ==================== IN-PLACE NOTICE (NO BLOCKING ALERT) ====================
+  const ORIGIN_SHORT = {
+    "歷屆甲部筆試真題": "歷屆真題",
+    "網上考生高頻回報（LIHKG／模擬試）": "網上高頻",
+    "2025–2026 最新生效法例（運輸署）": "2025–2026 新例",
+    "運輸署現行守則新修訂重點": "現行新例",
+    "運輸署現行《道路使用者守則》": "現行守則"
+  };
+
+  function shortOrigin(q) {
+    return ORIGIN_SHORT[q.source?.origin] || "現行守則";
+  }
+
+  function fullSourceMeta(q, { includePage = true } = {}) {
+    const origin = q.source?.origin || "運輸署現行《道路使用者守則》";
+    const loc = `${q.source.chapter} · ${q.source.section}`;
+    const pagePart = includePage ? `（P.${q.source.page}）` : "";
+    return `${origin} · ${loc}${pagePart}`;
+  }
+
+  // ==================== IN-PLACE NOTICE ====================
   function clearNotice() {
     if (noticeTimer) {
       clearTimeout(noticeTimer);
@@ -123,12 +118,10 @@
         onCta();
       };
     }
-    if (duration > 0) {
-      noticeTimer = setTimeout(clearNotice, duration);
-    }
+    if (duration > 0) noticeTimer = setTimeout(clearNotice, duration);
   }
 
-  // ==================== AUDIO & CONFETTI ====================
+  // ==================== AUDIO & PASS CONFETTI ====================
   let audioCtx = null;
   function playTone(kind, combo = 1) {
     if (!soundOn) return;
@@ -138,7 +131,7 @@
       if (!audioCtx) audioCtx = new Ctx();
       if (audioCtx.state === "suspended") audioCtx.resume();
       const now = audioCtx.currentTime;
-      const beep = (freq, start, dur, vol = 0.07, type = "triangle") => {
+      const beep = (freq, start, dur, vol = 0.06, type = "triangle") => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = type;
@@ -152,24 +145,23 @@
         osc.stop(start + dur);
       };
       if (kind === "correct") {
-        const base = 523.25 * Math.pow(2, Math.min(combo - 1, 7) / 12);
-        beep(base, now, 0.14);
-        beep(base * 1.25, now + 0.07, 0.2);
-        if (combo >= 3) beep(base * 1.5, now + 0.13, 0.24, 0.065, "sine");
+        const base = 523.25 * Math.pow(2, Math.min(combo - 1, 5) / 12);
+        beep(base, now, 0.12);
+        beep(base * 1.25, now + 0.06, 0.16);
       } else if (kind === "redeemed") {
-        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => beep(f, now + i * 0.065, 0.2));
+        [523.25, 659.25, 783.99].forEach((f, i) => beep(f, now + i * 0.06, 0.16));
       } else if (kind === "wrong") {
-        beep(300, now, 0.12, 0.045, "sine");
-        beep(260, now + 0.1, 0.16, 0.04, "sine");
+        beep(290, now, 0.11, 0.04, "sine");
+        beep(250, now + 0.09, 0.14, 0.035, "sine");
       } else if (kind === "pass") {
-        [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => beep(f, now + i * 0.08, 0.3));
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => beep(f, now + i * 0.08, 0.25));
       }
     } catch (err) {
       console.warn("Audio feedback unavailable:", err);
     }
   }
 
-  function burstConfetti(count = 22) {
+  function burstConfetti(count = 44) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const canvas = $("confetti-canvas");
     if (!canvas) return;
@@ -177,15 +169,15 @@
     if (!ctx) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const colors = ["#007a4d", "#10b981", "#005eb8", "#b45309", "#c81e1e"];
+    const colors = ["#007a4d", "#10b981", "#005eb8", "#b45309"];
     const pieces = Array.from({ length: count }, () => ({
       x: canvas.width * (0.28 + Math.random() * 0.44),
-      y: canvas.height * 0.28,
-      vx: (Math.random() - 0.5) * 10,
-      vy: -Math.random() * 9 - 2.5,
-      size: 5 + Math.random() * 5,
+      y: canvas.height * 0.26,
+      vx: (Math.random() - 0.5) * 9,
+      vy: -Math.random() * 8 - 2.5,
+      size: 5 + Math.random() * 4,
       rot: Math.random() * Math.PI * 2,
-      vrot: (Math.random() - 0.5) * 0.22,
+      vrot: (Math.random() - 0.5) * 0.2,
       color: colors[Math.floor(Math.random() * colors.length)],
       life: 1
     }));
@@ -197,7 +189,7 @@
       for (const p of pieces) {
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.32;
+        p.vy += 0.3;
         p.rot += p.vrot;
         p.life -= 0.018;
         if (p.life > 0) {
@@ -211,7 +203,7 @@
           ctx.restore();
         }
       }
-      if (alive > 0 && frame < 80) requestAnimationFrame(tick);
+      if (alive > 0 && frame < 75) requestAnimationFrame(tick);
       else ctx.clearRect(0, 0, canvas.width, canvas.height);
     })();
   }
@@ -250,10 +242,9 @@
       dot.classList.toggle("is-error", ok === false);
     }
     if ($("sync-label")) $("sync-label").textContent = text;
-    if ($("footer-sync-note")) $("footer-sync-note").textContent = ` · 代號 ${profileId}`;
     if ($("sync-status-detail")) {
       $("sync-status-detail").innerHTML =
-        `狀態：<strong>${esc(text)}</strong> · 代號：<code>${esc(profileId)}</code> · 已追蹤：<strong class="tnum">${Object.keys(progressMap).length} / ${window.QUESTIONS.length}</strong>`;
+        `狀態：<strong>${esc(text)}</strong> · 代號：<code>${esc(profileId)}</code> · 已記錄：<strong class="tnum">${Object.keys(progressMap).length} / ${window.QUESTIONS.length}</strong>`;
     }
   }
 
@@ -275,6 +266,15 @@
             filter: `profile_id=eq.${profileId}`
           },
           (payload) => {
+            if (payload.eventType === "DELETE") {
+              const oldId = payload.old?.question_id;
+              if (oldId && progressMap[oldId]) {
+                delete progressMap[oldId];
+                saveLocalCache();
+                if ($("view-quiz").hidden) renderAll();
+              }
+              return;
+            }
             const row = payload.new;
             if (!row || !row.question_id) return;
             const local = progressMap[row.question_id];
@@ -298,7 +298,7 @@
       renderAll();
     }
     if (!window.supabase) {
-      setSyncUI(false, "離線本機");
+      setSyncUI(false, "離線");
       return;
     }
     try {
@@ -338,7 +338,7 @@
       if (!silent) subscribeRealtime();
     } catch (err) {
       console.warn("Supabase fallback:", err);
-      setSyncUI(false, "離線本機");
+      setSyncUI(false, "離線");
     }
   }
 
@@ -492,26 +492,6 @@
     return Math.min(100, Math.round(cov + acc));
   }
 
-  function pickEmotion({ isRight, combo, wasPreviouslyWrong }) {
-    const bank = window.EMOTIONAL_BANK;
-    let pool, style;
-    if (!isRight) { pool = bank.comfort; style = "is-wrong"; }
-    else if (wasPreviouslyWrong) { pool = bank.redeemed; style = "is-redeemed"; }
-    else if (combo >= 6) { pool = bank.godlike; style = "is-streak"; }
-    else if (combo >= 3) { pool = bank.streak; style = "is-streak"; }
-    else { pool = bank.fresh; style = "is-right"; }
-
-    let pick = pool[Math.floor(Math.random() * pool.length)];
-    for (let i = 0; i < 6 && pick.text === lastEmotionText; i++) pick = pool[Math.floor(Math.random() * pool.length)];
-    lastEmotionText = pick.text;
-    return {
-      icon: pick.icon,
-      badge: pick.badge.replace(/\{combo\}/g, String(combo)),
-      text: pick.text.replace(/\{combo\}/g, String(combo)),
-      style
-    };
-  }
-
   function shuffle(arr) {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -552,7 +532,7 @@
   function launchExam() {
     startSession({
       mode: "exam",
-      label: revealAtEndPref ? "模擬試 · 交卷揭曉" : "模擬試 · 即時拆解",
+      label: revealAtEndPref ? "模擬試 · 交卷揭曉" : "模擬試",
       questions: buildMockExam(),
       revealAtEnd: revealAtEndPref
     });
@@ -565,6 +545,8 @@
     }
     session = { mode, label, questions, revealAtEnd, index: 0, answers: {}, combo: 0, submitted: false };
     $("quiz-mode-label").textContent = label;
+    $("quiz-dots-panel").hidden = true;
+    $("btn-toggle-dots").setAttribute("aria-expanded", "false");
     showView("quiz");
     renderCurrentQuestion();
   }
@@ -574,31 +556,24 @@
     const total = window.QUESTIONS.length;
     const mastered = window.QUESTIONS.filter((q) => (progressMap[q.id]?.box || 0) >= 3).length;
     const activeMistakes = getActiveMistakes();
-    const due = getDueQuestions();
+    const dueCount = Math.max(getDueQuestions().length, activeMistakes.length);
     const readiness = computeReadiness();
 
-    const circ = 301.59;
-    $("readiness-arc").style.strokeDashoffset = String(circ - (circ * readiness) / 100);
     $("readiness-pct").textContent = `${readiness}%`;
-
-    let rank = "起步階段";
-    let heading = "模擬甲部筆試";
-    if (readiness >= 85) { rank = "1TakePass 必勝"; heading = "狀態滿分 · 隨時考得"; }
-    else if (readiness >= 60) { rank = "準 P 牌水平"; heading = "進度穩健 · 清埋弱點"; }
-    else if (readiness >= 25) { rank = "穩步上路"; heading = "繼續保持手感"; }
-    $("rank-pill").textContent = rank;
-    $("hero-greeting").textContent = heading;
+    $("readiness-bar-fill").style.transform = `scaleX(${(readiness / 100).toFixed(4)})`;
 
     $("stat-mastered").textContent = `${mastered} / ${total}`;
-    $("stat-best-combo").textContent = String(stats.best_combo || 0);
-    $("stat-exams-passed").textContent = String(stats.exams_passed || 0);
+    $("stat-exams-passed").textContent = `${stats.exams_passed || 0} 次`;
     $("stat-active-mistakes").textContent = String(activeMistakes.length);
+    $("btn-stat-mistakes").classList.toggle("has-mistakes", activeMistakes.length > 0);
 
-    $("home-due-count").textContent = String(Math.max(due.length, activeMistakes.length));
+    const duePill = $("home-due-count");
+    duePill.textContent = String(dueCount);
+    duePill.hidden = dueCount === 0;
+
     $("count-image-qs").textContent = `${window.QUESTIONS.filter((q) => q.type === "image").length} 題`;
     $("count-text-qs").textContent = `${window.QUESTIONS.filter((q) => q.type === "text").length} 題`;
     $("count-trap-qs").textContent = `${window.QUESTIONS.filter((q) => q.trapTag).length} 題`;
-    $("count-mistake-qs").textContent = `${activeMistakes.length} 題`;
 
     const badge = $("nav-mistake-badge");
     badge.textContent = String(activeMistakes.length);
@@ -615,19 +590,23 @@
       const done = qs.filter((q) => (progressMap[q.id]?.box || 0) >= 2).length;
       const err = qs.filter((q) => progressMap[q.id]?.box === 0).length;
       const ratio = qs.length ? done / qs.length : 0;
-      const pct = Math.round(ratio * 100);
       return `
-        <button class="chapter-card" data-chapter="${cat.id}" type="button">
-          <div class="chapter-top">
-            <span class="chapter-title" style="color:${cat.color}">${ICONS[cat.icon] || ""}<span style="color:var(--ink)">${esc(cat.name)}</span></span>
-            ${err > 0 ? `<span class="chip chip-red tnum">${err} 錯</span>` : `<span class="chip chip-neutral tnum">${qs.length} 題</span>`}
+        <button class="chapter-row" data-chapter="${cat.id}" type="button">
+          <div class="chapter-info">
+            <span class="chapter-name">
+              <span class="chapter-dot" style="background:${cat.color}" aria-hidden="true"></span>
+              <span>${esc(cat.name)}</span>
+            </span>
+            <div class="chapter-bar"><div class="chapter-fill" style="transform:scaleX(${ratio.toFixed(4)});background:${cat.color}"></div></div>
           </div>
-          <div class="chapter-bar"><div class="chapter-fill" style="transform:scaleX(${ratio.toFixed(4)});background:${cat.color}"></div></div>
-          <div class="chapter-foot tnum"><span>熟練 ${pct}%</span><span>${done}/${qs.length}</span></div>
+          <div class="chapter-right tnum">
+            <span>${done}/${qs.length}</span>
+            ${err > 0 ? `<span class="chapter-err">${err} 錯</span>` : ""}
+          </div>
         </button>`;
     }).join("");
 
-    grid.querySelectorAll(".chapter-card").forEach((btn) => {
+    grid.querySelectorAll(".chapter-row").forEach((btn) => {
       btn.onclick = () => {
         const cat = window.CATEGORIES.find((c) => c.id === btn.dataset.chapter);
         if (!cat) return;
@@ -654,11 +633,13 @@
     $("quiz-progress-text").textContent = `${idx + 1} / ${total}`;
     const answered = Object.keys(session.answers).length;
     const right = Object.values(session.answers).filter((a) => a.isRight).length;
-    $("quiz-score-live").textContent = session.revealAtEnd ? `已答 ${answered}/${total}` : `答對 ${right}/${answered}`;
+    $("quiz-score-live").textContent = session.revealAtEnd
+      ? `已答 ${answered}/${total}`
+      : answered > 0 ? `答對 ${right}/${answered}` : "";
     $("quiz-progress-fill").style.transform = `scaleX(${((idx + 1) / total).toFixed(4)})`;
 
     const comboPill = $("quiz-combo-pill");
-    if (!session.revealAtEnd && session.combo >= 2) {
+    if (!session.revealAtEnd && session.combo >= 3) {
       comboPill.hidden = false;
       $("quiz-combo-num").textContent = String(session.combo);
     } else {
@@ -674,16 +655,20 @@
       return `<button type="button" class="${cls}" data-qidx="${i}" aria-label="第 ${i + 1} 題"${i === idx ? ` aria-current="step"` : ""}>${i + 1}</button>`;
     }).join("");
     dots.querySelectorAll(".q-dot").forEach((d) => {
-      d.onclick = () => { session.index = Number(d.dataset.qidx); renderCurrentQuestion(); };
+      d.onclick = () => {
+        session.index = Number(d.dataset.qidx);
+        $("quiz-dots-panel").hidden = true;
+        $("btn-toggle-dots").setAttribute("aria-expanded", "false");
+        renderCurrentQuestion();
+      };
     });
 
-    const badges = [
-      cat ? `<span class="chip chip-neutral">${esc(cat.short)}</span>` : "",
-      q.type === "image" ? `<span class="chip chip-cobalt">圖片題</span>` : `<span class="chip chip-neutral">文字題</span>`
-    ];
-    if (q.trapTag) badges.push(`<span class="chip chip-amber">${esc(q.trapTag)}</span>`);
-    if (prevProg?.wrong_count > 0) badges.push(`<span class="chip chip-red tnum">曾錯 ${prevProg.wrong_count} 次</span>`);
-    $("q-badges").innerHTML = badges.join("");
+    // Single quiet metadata line — no redundant type chips or rainbow pills
+    const metaParts = [];
+    if (cat) metaParts.push(`<span>${esc(cat.short)}</span>`);
+    if (q.trapTag) metaParts.push(`<span class="meta-warn">${esc(q.trapTag)}</span>`);
+    if (prevProg?.wrong_count > 0) metaParts.push(`<span class="meta-err tnum">曾錯 ${prevProg.wrong_count} 次</span>`);
+    $("q-meta").innerHTML = metaParts.join(`<span class="meta-sep" aria-hidden="true">·</span>`);
 
     const visual = $("q-visual");
     if (q.sign && window.SIGN_ASSETS[q.sign]) {
@@ -712,6 +697,7 @@
         } else {
           if (letter === q.answer) { cls += " is-correct"; status = ans.chosen === letter ? "正確" : "正解"; }
           else if (ans.chosen === letter) { cls += " is-wrong"; status = "誤選"; }
+          else { cls += " is-dimmed"; }
         }
       }
       return `
@@ -723,39 +709,74 @@
     }).join("");
     list.querySelectorAll(".option-btn").forEach((b) => { b.onclick = () => handleOptionSelect(b.dataset.opt); });
 
-    const emoEl = $("emotion-banner");
-    const autoEl = $("autopsy-panel");
-    const refEl = $("autopsy-reflect");
+    const explainEl = $("explain-panel");
+    const chosenWrongEl = $("explain-chosen-wrong");
+    const hookWrap = $("explain-hook");
+    const detailsFold = $("explain-details");
+    const reflectFold = $("reflect-details");
 
     if (showNow) {
-      emoEl.hidden = false;
-      emoEl.className = `emotion-strip ${ans.emotion.style}`;
-      $("emotion-icon").innerHTML = ICONS[ans.emotion.icon] || ICONS.checkCircle;
-      $("emotion-badge").textContent = ans.emotion.badge;
-      $("emotion-text").textContent = ans.emotion.text;
+      explainEl.hidden = false;
 
-      autoEl.hidden = false;
-      $("autopsy-right-text").textContent = `${q.answer} · ${q.whyRight}`;
-      $("autopsy-wrong-list").innerHTML = ["A", "B", "C"]
-        .filter((l) => l !== q.answer)
-        .map((l) => `<li><span class="wrong-tag">${l}</span><span>${l === ans.chosen ? "<strong>[你選]</strong> " : ""}${esc(q.whyWrong[l])}</span></li>`)
-        .join("");
+      const statusEl = $("explain-status");
+      if (ans.isRight && ans.wasPreviouslyWrong) {
+        statusEl.textContent = "答對 · 錯題已掌握";
+        statusEl.className = "explain-status is-redeemed";
+      } else if (ans.isRight) {
+        statusEl.textContent = "答對";
+        statusEl.className = "explain-status is-right";
+      } else {
+        statusEl.textContent = `答錯 · 正解 ${q.answer}`;
+        statusEl.className = "explain-status is-wrong";
+      }
 
-      $("autopsy-page-badge").textContent = `第 ${q.source.page} 頁`;
-      $("autopsy-source-meta").textContent = `《道路使用者守則》2020版 · ${q.source.chapter} · ${q.source.section}`;
-      $("autopsy-source-quote").textContent = `「${q.source.quote}」`;
-      $("autopsy-hook-text").textContent = q.memoryHook;
+      $("explain-page").textContent = `${shortOrigin(q)} · P.${q.source.page}`;
 
+      // Show only the reason why the user's chosen option is wrong (avoid repeating option letter already highlighted above)
+      if (!ans.isRight && q.whyWrong[ans.chosen]) {
+        chosenWrongEl.hidden = false;
+        chosenWrongEl.innerHTML = `<strong>錯因：</strong>${esc(q.whyWrong[ans.chosen])}`;
+      } else {
+        chosenWrongEl.hidden = true;
+        chosenWrongEl.innerHTML = "";
+      }
+
+      $("explain-right-text").textContent = q.whyRight;
+
+      if (q.memoryHook) {
+        hookWrap.hidden = false;
+        $("explain-hook-text").textContent = q.memoryHook;
+      } else {
+        hookWrap.hidden = true;
+      }
+
+      // Collapsed details: remaining wrong options + explicit provenance & official quote (no duplicate page number)
+      detailsFold.open = false;
+      const otherLetters = ["A", "B", "C"].filter((l) => l !== q.answer && (ans.isRight || l !== ans.chosen));
+      const otherList = $("explain-other-wrong");
+      if (otherLetters.length) {
+        otherList.hidden = false;
+        otherList.innerHTML = otherLetters
+          .map((l) => `<li><span class="wrong-tag">${l}</span><span>${esc(q.whyWrong[l])}</span></li>`)
+          .join("");
+      } else {
+        otherList.hidden = true;
+        otherList.innerHTML = "";
+      }
+      $("explain-source-meta").textContent = fullSourceMeta(q, { includePage: false });
+      $("explain-source-quote").textContent = `「${q.source.quote}」`;
+
+      // Reflection fold (only on wrong answers or questions that already have a saved reason/note)
       const prog = progressMap[q.id];
       if (!ans.isRight || prog?.personal_note || prog?.mistake_reason) {
-        refEl.hidden = false;
+        reflectFold.hidden = false;
+        reflectFold.open = false;
         renderReflection(q.id, prog);
       } else {
-        refEl.hidden = true;
+        reflectFold.hidden = true;
       }
     } else {
-      emoEl.hidden = true;
-      autoEl.hidden = true;
+      explainEl.hidden = true;
     }
 
     $("btn-prev-q").hidden = idx === 0;
@@ -765,30 +786,46 @@
     if (session.revealAtEnd) {
       $("btn-next-q").hidden = isLast;
       $("btn-submit-exam").hidden = !allDone && !isLast;
-      $("btn-submit-exam").textContent = allDone ? "交卷睇詳解" : `交卷（餘 ${total - answered} 題）`;
+      $("btn-submit-exam").textContent = allDone ? "交卷睇成績" : `交卷（餘 ${total - answered} 題）`;
     } else {
       $("btn-next-q").hidden = !ans || isLast;
       $("btn-submit-exam").hidden = !ans || !isLast;
-      $("btn-submit-exam").textContent = "查看成績報告";
+      $("btn-submit-exam").textContent = "查看成績";
+    }
+  }
+
+  function updateReflectPreview(prog) {
+    const preview = $("reflect-summary-badge");
+    if (!preview) return;
+    const reasonLabel = window.MISTAKE_REASONS.find((r) => r.id === prog?.mistake_reason)?.label;
+    const parts = [];
+    if (reasonLabel) parts.push(reasonLabel);
+    if (prog?.personal_note) parts.push(prog.personal_note);
+    if (parts.length) {
+      preview.textContent = parts.join(" · ");
+      preview.hidden = false;
+    } else {
+      preview.textContent = "";
+      preview.hidden = true;
     }
   }
 
   function renderReflection(qId, prog) {
+    updateReflectPreview(prog);
     const chips = $("reason-chips");
-    chips.innerHTML = window.MISTAKE_REASONS.map(
-      (r) => {
-        const selected = prog?.mistake_reason === r.id;
-        return `<button type="button" class="reason-chip ${selected ? "is-selected" : ""}" aria-pressed="${selected}" data-reason="${r.id}">${esc(r.label)}</button>`;
-      }
-    ).join("");
+    chips.innerHTML = window.MISTAKE_REASONS.map((r) => {
+      const selected = prog?.mistake_reason === r.id;
+      return `<button type="button" class="reason-chip ${selected ? "is-selected" : ""}" aria-pressed="${selected}" data-reason="${r.id}">${esc(r.label)}</button>`;
+    }).join("");
     chips.querySelectorAll(".reason-chip").forEach((c) => {
       c.onclick = async () => {
         if (!progressMap[qId]) return;
-        progressMap[qId].mistake_reason = c.dataset.reason;
+        const nextVal = progressMap[qId].mistake_reason === c.dataset.reason ? null : c.dataset.reason;
+        progressMap[qId].mistake_reason = nextVal;
         progressMap[qId].updated_at = new Date().toISOString();
         const synced = await syncQuestionProgress(progressMap[qId]);
         renderReflection(qId, progressMap[qId]);
-        $("note-saved-hint").textContent = synced ? "已同步至雲端" : "已存本機（待同步）";
+        $("note-saved-hint").textContent = synced ? "已同步" : "已存本機";
         $("note-saved-hint").hidden = false;
       };
     });
@@ -804,7 +841,8 @@
       progressMap[qId].personal_note = input.value.trim();
       progressMap[qId].updated_at = new Date().toISOString();
       const synced = await syncQuestionProgress(progressMap[qId]);
-      hint.textContent = synced ? "已同步至雲端" : "已存本機（待同步）";
+      updateReflectPreview(progressMap[qId]);
+      hint.textContent = synced ? "已同步" : "已存本機";
       hint.hidden = false;
     };
 
@@ -832,12 +870,10 @@
 
     session.combo = isRight ? session.combo + 1 : 0;
     const { wasPreviouslyWrong } = recordAnswer(q.id, chosen, isRight);
-    const emotion = pickEmotion({ isRight, combo: session.combo, wasPreviouslyWrong });
-    session.answers[idx] = { chosen, isRight, emotion, wasPreviouslyWrong };
+    session.answers[idx] = { chosen, isRight, wasPreviouslyWrong };
 
     if (isRight) {
       playTone(wasPreviouslyWrong ? "redeemed" : "correct", session.combo);
-      burstConfetti(wasPreviouslyWrong ? 36 : session.combo >= 3 ? 28 : 14);
     } else {
       playTone("wrong");
     }
@@ -872,7 +908,7 @@
       stats.exams_passed = (stats.exams_passed || 0) + 1;
       syncStats();
       playTone("pass");
-      burstConfetti(60);
+      burstConfetti(44);
     }
 
     const examRec = {
@@ -891,7 +927,7 @@
     showView("summary");
   }
 
-  // ==================== SUMMARY & REVIEW CARDS ====================
+  // ==================== SUMMARY & UNIFIED REVIEW CARDS ====================
   function renderSummary(rec) {
     const { total_questions: total, correct_count: correct, passed, answers } = rec;
     const pct = Math.round((correct / total) * 100);
@@ -899,23 +935,24 @@
 
     $("summary-hero").classList.toggle("is-fail", !passed);
     $("summary-status-pill").textContent = passed
-      ? (total === EXAM_LEN ? "模擬試及格（≥16/20）" : "達標（≥80%）")
-      : `未達標 · 錯 ${wrongs.length} 題`;
+      ? (total === EXAM_LEN ? "模擬試及格" : "已達標")
+      : "未達標";
     $("summary-score-title").textContent = `${correct} / ${total}（${pct}%）`;
     $("summary-message").textContent =
       passed && wrongs.length === 0
-        ? "滿分零失誤，隨時可應考！"
+        ? "全部答對，可隨時應考。"
         : passed
-        ? `已過及格線，即時重做 ${wrongs.length} 條錯題可鎖死記憶。`
-        : "今次排走盲點賺咗！睇完拆解再重做錯題即刻升班。";
+        ? "已達及格線，可即時重做錯題鞏固記憶。"
+        : "未達及格線，先睇解析再重練。";
 
     const retryBtn = $("btn-retry-session-mistakes");
     if (wrongs.length > 0) {
+      const hasUnanswered = wrongs.some((r) => r.chosen === "未答");
       retryBtn.hidden = false;
-      retryBtn.textContent = `重做今次 ${wrongs.length} 條錯題`;
+      retryBtn.textContent = hasUnanswered ? `重做 ${wrongs.length} 條錯／漏題` : `重做 ${wrongs.length} 條錯題`;
       retryBtn.onclick = () => startSession({
         mode: "mistakes",
-        label: "今次錯題重溫",
+        label: hasUnanswered ? "今次錯／漏題" : "今次錯題",
         questions: wrongs.map((r) => Q_BY_ID[r.qId]).filter(Boolean),
         revealAtEnd: false
       });
@@ -940,61 +977,67 @@
 
     const listEl = $("summary-review-list");
     if (filtered.length) {
-      listEl.innerHTML = filtered.map((r, i) => buildReviewCard(Q_BY_ID[r.qId], r, !r.isRight, i + 1)).join("");
+      listEl.innerHTML = filtered.map((r) => buildReviewCard(Q_BY_ID[r.qId], r, !r.isRight)).join("");
       bindReviewNotes(listEl);
     } else {
       listEl.innerHTML = `
         <div class="empty-state">
           <span>此篩選條件下未有符合題目。</span>
-          <button type="button" class="btn btn-secondary btn-sm js-reset-sfilter">顯示全部題目</button>
+          <button type="button" class="btn btn-secondary btn-sm js-reset-sfilter">顯示全部</button>
         </div>`;
       const resetBtn = listEl.querySelector(".js-reset-sfilter");
       if (resetBtn) resetBtn.onclick = () => { summaryFilter = "all"; renderSummary(rec); };
     }
   }
 
-  function buildReviewCard(q, info, openDefault = false, num = null) {
+  function buildReviewCard(q, info, openDefault = false) {
     const prog = progressMap[q.id];
     const isWrong = info ? !info.isRight : prog?.last_result === "wrong";
     const chosen = info ? info.chosen : prog?.last_selected_option;
     const reasonLabel = window.MISTAKE_REASONS.find((r) => r.id === prog?.mistake_reason)?.label;
 
-    const wrongLis = ["A", "B", "C"]
-      .filter((l) => l !== q.answer)
-      .map((l) => `<li><span class="wrong-tag">${l}</span><span>${l === chosen ? "<strong>[誤選]</strong> " : ""}${esc(q.whyWrong[l])}</span></li>`)
-      .join("");
+    // Header summarizes outcome ONCE (no duplicate "你選 X" or repeated page number below)
+    let statusHtml = "";
+    if (isWrong) {
+      const wrongTag = chosen && chosen !== "未答" ? `誤選 ${esc(chosen)}` : "未作答";
+      statusHtml = `<span class="ans-wrong">${wrongTag}</span><span class="ans-sep" aria-hidden="true">→</span><span class="ans-right">正解 ${q.answer}</span>`;
+    } else {
+      statusHtml = `<span class="ans-right">答對 ${q.answer}</span>`;
+    }
+
+    const wrongLine = isWrong && chosen && q.whyWrong[chosen]
+      ? `<p class="explain-wrong-self"><strong>錯因：</strong>${esc(q.whyWrong[chosen])}</p>`
+      : "";
+
+    // Show concise mnemonic hook (or whyRight if no hook) — avoids repeating full correct answer already shown in header
+    const takeawayHtml = q.memoryHook
+      ? `<p class="explain-hook"><span class="hook-k">口訣</span><span>${esc(q.memoryHook)}</span></p>`
+      : `<p class="explain-main">${esc(q.whyRight)}</p>`;
 
     return `
       <details class="review-item ${isWrong ? "is-wrong" : "is-right"}" ${openDefault ? "open" : ""}>
         <summary class="review-summary">
+          <span class="review-dot" aria-hidden="true"></span>
           ${q.sign && window.SIGN_ASSETS[q.sign] ? `<div class="review-thumb">${window.renderSignImg(q.sign, { thumb: true })}</div>` : ""}
           <div class="review-head">
-            <div class="review-tags">
-              ${num !== null ? `<span class="chip chip-neutral tnum">#${num}</span>` : ""}
-              <span class="chip ${isWrong ? "chip-red" : "chip-emerald"}">${isWrong ? "錯" : "對"}</span>
-              <span class="chip chip-cobalt tnum">第 ${q.source.page} 頁</span>
-              ${q.type === "image" ? `<span class="chip chip-neutral">圖片</span>` : ""}
-              ${reasonLabel ? `<span class="chip chip-amber">${esc(reasonLabel)}</span>` : ""}
-            </div>
             <div class="review-q">${esc(q.prompt)}</div>
             <div class="review-ans-line">
-              ${chosen ? `<span>選：<strong>${esc(chosen)}</strong></span>` : ""}
-              <span>正解：<strong style="color:var(--emerald)">${q.answer} · ${esc(q.options[q.answer])}</strong></span>
+              ${statusHtml}
+              <span class="ans-opt">${esc(q.options[q.answer])}</span>
+              ${reasonLabel ? `<span>· ${esc(reasonLabel)}</span>` : ""}
             </div>
           </div>
         </summary>
         <div class="review-body">
           ${q.sign && window.SIGN_ASSETS[q.sign] ? `<div class="q-visual">${window.renderSignImg(q.sign)}</div>` : ""}
-          <div class="autopsy-row row-right"><div class="autopsy-label">正確解析</div><p>${q.answer} · ${esc(q.whyRight)}</p></div>
-          <div class="autopsy-row row-wrong"><div class="autopsy-label">錯誤選項盲點</div><ul class="wrong-list">${wrongLis}</ul></div>
-          <div class="autopsy-row row-source">
-            <div class="source-top"><span class="autopsy-label">守則出處</span><span class="page-pill tnum">第 ${q.source.page} 頁</span></div>
-            <div class="source-loc">${esc(q.source.chapter)} · ${esc(q.source.section)}</div>
+          ${wrongLine}
+          ${takeawayHtml}
+          <div class="source-block">
+            <div class="source-loc">${esc(fullSourceMeta(q, { includePage: true }))}</div>
             <blockquote class="source-quote">「${esc(q.source.quote)}」</blockquote>
           </div>
-          <div class="autopsy-row row-hook"><div class="autopsy-label">記法口訣</div><p>${esc(q.memoryHook)}</p></div>
-          ${prog ? `<div class="autopsy-row row-reflect">
-            <div class="autopsy-label tnum">筆記（對 ${prog.correct_count} / 錯 ${prog.wrong_count} · Box ${prog.box}）</div>
+          ${prog ? `<div class="review-note-wrap">
+            <span class="review-note-meta tnum">個人筆記 · 對 ${prog.correct_count} / 錯 ${prog.wrong_count}</span>
             <div class="note-row">
               <input type="text" class="text-input js-review-note" data-qid="${q.id}" value="${esc(prog.personal_note || "")}" placeholder="寫低防錯提醒…" maxlength="120" autocomplete="off" aria-label="個人筆記">
               <button type="button" class="btn btn-secondary btn-sm js-save-review-note" data-qid="${q.id}">儲存</button>
@@ -1013,7 +1056,7 @@
         progressMap[qId].personal_note = input.value.trim();
         progressMap[qId].updated_at = new Date().toISOString();
         const synced = await syncQuestionProgress(progressMap[qId]);
-        btn.textContent = synced ? "已存" : "已存本機";
+        btn.textContent = synced ? "已存" : "本機已存";
         setTimeout(() => { btn.textContent = "儲存"; }, 1200);
       };
       btn.onclick = save;
@@ -1045,9 +1088,14 @@
     const rc = {};
     Object.values(progressMap).forEach((p) => { if (p.mistake_reason) rc[p.mistake_reason] = (rc[p.mistake_reason] || 0) + 1; });
     const entries = window.MISTAKE_REASONS.filter((r) => rc[r.id] > 0);
-    $("reason-stats").innerHTML = entries.length
-      ? entries.map((r) => `<span class="chip chip-cobalt tnum">${esc(r.label)} × ${rc[r.id]}</span>`).join("")
-      : `<span class="sec-sub">答錯後標記錯因，自動統計弱點分佈</span>`;
+    const reasonEl = $("reason-stats");
+    if (entries.length) {
+      reasonEl.hidden = false;
+      reasonEl.innerHTML = entries.map((r) => `<span class="reason-stat-pill tnum">${esc(r.label)} × ${rc[r.id]}</span>`).join("");
+    } else {
+      reasonEl.hidden = true;
+      reasonEl.innerHTML = "";
+    }
 
     document.querySelectorAll("#mistake-filters .filter-btn").forEach((p) => {
       const active = p.dataset.mfilter === mistakeFilter;
@@ -1061,10 +1109,10 @@
 
     const box = $("mistake-list");
     if (list.length) {
-      box.innerHTML = list.map((q) => buildReviewCard(q, null, false, null)).join("");
+      box.innerHTML = list.map((q) => buildReviewCard(q, null, false)).join("");
       bindReviewNotes(box);
     } else {
-      const msg = mistakeFilter === "active" ? "目前零待擊破錯題，保持節奏。" : "暫無錯題紀錄，先考一卷檢測盲點。";
+      const msg = mistakeFilter === "active" ? "目前零待擊破錯題。" : "暫無錯題紀錄，先考一卷檢測盲點。";
       box.innerHTML = `
         <div class="empty-state">
           <span>${msg}</span>
@@ -1083,7 +1131,7 @@
       <article class="contrast-card">
         <div class="contrast-head">
           <h3>${esc(c.title)}</h3>
-          <span class="chip chip-cobalt tnum">${esc(c.page)}</span>
+          <span class="contrast-page tnum">${esc(c.page)}</span>
         </div>
         <div class="contrast-pair">
           <div class="contrast-side">
@@ -1097,7 +1145,7 @@
             <p>${esc(c.right.rule)}</p>
           </div>
         </div>
-        <div class="contrast-hook">口訣：${esc(c.hook)}</div>
+        <div class="contrast-hook"><span class="hook-k">口訣</span><span>${esc(c.hook)}</span></div>
       </article>`).join("");
   }
 
@@ -1113,23 +1161,20 @@
       if (btn) btn.onclick = launchExam;
       return;
     }
-    const names = { exam: "模擬試", srs: "間隔複習", mistakes: "錯題特訓", signs: "圖片路牌", practice: "專項訓練", chapter: "章節練習" };
+    const names = { exam: "模擬試", srs: "到期複習", mistakes: "錯題特訓", signs: "圖片路牌", practice: "專項練習", chapter: "章節溫習" };
     el.innerHTML = examHistory.map((rec, i) => {
       const dt = new Date(rec.created_at);
       const dateStr = isNaN(dt) ? "" : dt.toLocaleString("zh-HK", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
       const pct = Math.round((rec.correct_count / rec.total_questions) * 100);
       return `
         <div class="history-row">
-          <div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <strong>${names[rec.mode] || "練習"}</strong>
-              <span class="chip ${rec.passed ? "chip-emerald" : "chip-amber"}">${rec.passed ? "及格" : "未達標"}</span>
-            </div>
+          <div class="history-meta">
+            <strong>${names[rec.mode] || "練習"}</strong>
             <span class="sec-sub tnum">${esc(dateStr)}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:10px">
+          <div class="history-right">
             <span class="history-score ${rec.passed ? "is-pass" : "is-fail"}">${rec.correct_count}/${rec.total_questions} <small>(${pct}%)</small></span>
-            <button type="button" class="btn btn-secondary btn-sm js-open-hist" data-hidx="${i}">詳解</button>
+            <button type="button" class="btn btn-secondary btn-sm js-open-hist" data-hidx="${i}">回顧</button>
           </div>
         </div>`;
     }).join("");
@@ -1151,19 +1196,110 @@
     renderHistory();
   }
 
-  // ==================== ACCESSIBLE MODAL (FOCUS TRAP & RESTORE) ====================
+  // ==================== ACCESSIBLE MODAL & DATABASE RESET ====================
+  let isResettingDb = false;
+
   function getModalFocusables() {
     const card = document.querySelector("#sync-modal .modal-card");
     if (!card) return [];
     return Array.from(
       card.querySelectorAll('button:not([disabled]), input:not([disabled]), [href], select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
-    );
+    ).filter((el) => !el.closest("[hidden]"));
+  }
+
+  function resetConfirmUI() {
+    $("reset-trigger-row").hidden = false;
+    $("reset-confirm-box").hidden = true;
+    $("reset-error-msg").hidden = true;
+    $("reset-error-msg").textContent = "";
+    const confirmBtn = $("btn-confirm-reset");
+    const cancelBtn = $("btn-cancel-reset");
+    confirmBtn.disabled = false;
+    cancelBtn.disabled = false;
+    confirmBtn.removeAttribute("aria-busy");
+    confirmBtn.textContent = "確認清除全部資料";
+  }
+
+  function openResetConfirm() {
+    const qCount = Object.keys(progressMap).length;
+    const examCount = examHistory.length;
+    $("reset-confirm-copy").textContent =
+      `將永久清除代號「${profileId}」在雲端及本機的所有資料（${qCount} 題進度、${examCount} 份考試紀錄及個人筆記），並還原至初始狀態，無法復原。`;
+    $("reset-error-msg").hidden = true;
+    $("reset-trigger-row").hidden = true;
+    $("reset-confirm-box").hidden = false;
+    requestAnimationFrame(() => $("btn-cancel-reset").focus());
+  }
+
+  async function clearAllDatabase() {
+    if (isResettingDb) return;
+    isResettingDb = true;
+    const confirmBtn = $("btn-confirm-reset");
+    const cancelBtn = $("btn-cancel-reset");
+    const errEl = $("reset-error-msg");
+    errEl.hidden = true;
+    confirmBtn.disabled = true;
+    cancelBtn.disabled = true;
+    confirmBtn.setAttribute("aria-busy", "true");
+    confirmBtn.textContent = "清除中…";
+
+    let cloudCleared = false;
+    try {
+      if (!db && window.supabase) {
+        db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+      if (db) {
+        const [pDel, eDel, sDel] = await Promise.all([
+          db.from("onetake_progress").delete().eq("profile_id", profileId),
+          db.from("onetake_exams").delete().eq("profile_id", profileId),
+          db.from("onetake_stats").delete().eq("profile_id", profileId)
+        ]);
+        const err = pDel.error || eDel.error || sDel.error;
+        if (err) throw err;
+        cloudCleared = true;
+      }
+
+      localStorage.removeItem(cacheKey("progress"));
+      localStorage.removeItem(cacheKey("stats"));
+      localStorage.removeItem(cacheKey("exams"));
+      localStorage.removeItem("onetake_reveal_end");
+
+      progressMap = {};
+      examHistory = [];
+      stats = { total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0 };
+      session = null;
+      summaryFilter = "all";
+      mistakeFilter = "active";
+      revealAtEndPref = false;
+
+      setSyncUI(cloudCleared ? true : false, cloudCleared ? "已同步" : "離線");
+      isResettingDb = false;
+      closeSyncModal({ restoreFocus: false, force: true });
+      showView("home");
+      renderAll();
+      showNotice(
+        cloudCleared
+          ? `已清除代號「${profileId}」的雲端及本機資料，並還原至初始狀態。`
+          : `已清除代號「${profileId}」的本機資料（目前離線，雲端資料尚未清除）。`
+      );
+    } catch (err) {
+      console.warn("Clear database failed:", err);
+      errEl.textContent = "雲端清除失敗，請檢查網絡連線後重試。";
+      errEl.hidden = false;
+      confirmBtn.disabled = false;
+      cancelBtn.disabled = false;
+      confirmBtn.removeAttribute("aria-busy");
+      confirmBtn.textContent = "確認清除全部資料";
+    } finally {
+      isResettingDb = false;
+    }
   }
 
   function openSyncModal() {
     lastFocusedEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const input = $("input-profile-id");
     input.value = profileId;
+    resetConfirmUI();
     setSyncUI(syncState.ok, syncState.text);
     $("sync-modal").hidden = false;
     requestAnimationFrame(() => {
@@ -1172,10 +1308,12 @@
     });
   }
 
-  function closeSyncModal({ restoreFocus = true } = {}) {
+  function closeSyncModal({ restoreFocus = true, force = false } = {}) {
+    if (isResettingDb && !force) return;
     const modal = $("sync-modal");
     if (modal.hidden) return;
     modal.hidden = true;
+    resetConfirmUI();
     const target = restoreFocus ? lastFocusedEl : null;
     lastFocusedEl = null;
     if (target && typeof target.focus === "function") {
@@ -1183,9 +1321,78 @@
     }
   }
 
+  // ==================== IMAGE ZOOM LIGHTBOX (product-design + ui-animation) ====================
+  let lightboxTriggerEl = null;
+  let lightboxCloseTimer = null;
+
+  function setLightboxZoom(zoomed) {
+    const pad = $("lightbox-pad");
+    const btn = $("btn-zoom-toggle");
+    if (!pad || !btn) return;
+    pad.classList.toggle("is-zoomed", zoomed);
+    btn.textContent = zoomed ? "還原" : "放大";
+    btn.setAttribute("aria-pressed", String(zoomed));
+  }
+
+  function openLightbox(imgEl) {
+    const backdrop = $("image-lightbox");
+    const targetImg = $("lightbox-img");
+    const captionEl = $("lightbox-caption");
+    if (!backdrop || !targetImg || !imgEl) return;
+
+    if (lightboxCloseTimer) {
+      clearTimeout(lightboxCloseTimer);
+      lightboxCloseTimer = null;
+    }
+    backdrop.classList.remove("is-closing");
+    lightboxTriggerEl = imgEl;
+
+    targetImg.src = imgEl.currentSrc || imgEl.src;
+    targetImg.alt = imgEl.alt || "圖片放大檢視";
+
+    // Anti-spoiler: do not reveal sign meaning during an unanswered quiz question
+    const inUnrevealedQuiz =
+      !!imgEl.closest("#view-quiz") &&
+      !!session &&
+      (!session.answers[session.index] || session.revealAtEnd);
+    captionEl.textContent = inUnrevealedQuiz
+      ? "點擊圖片切換放大倍率 · 按 Esc 關閉"
+      : (imgEl.alt || "圖片放大檢視");
+
+    setLightboxZoom(false);
+    backdrop.hidden = false;
+    requestAnimationFrame(() => {
+      $("btn-close-lightbox")?.focus();
+    });
+  }
+
+  function closeLightbox({ restoreFocus = true } = {}) {
+    const backdrop = $("image-lightbox");
+    if (!backdrop || backdrop.hidden) return;
+    const finish = () => {
+      backdrop.hidden = true;
+      backdrop.classList.remove("is-closing");
+      setLightboxZoom(false);
+      const target = restoreFocus ? lightboxTriggerEl : null;
+      lightboxTriggerEl = null;
+      if (target && typeof target.focus === "function" && target.isConnected) {
+        requestAnimationFrame(() => target.focus());
+      }
+    };
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      finish();
+      return;
+    }
+    backdrop.classList.add("is-closing");
+    lightboxCloseTimer = setTimeout(() => {
+      lightboxCloseTimer = null;
+      finish();
+    }, 150);
+  }
+
   // ==================== THEME, SOUND & EVENTS ====================
   function updateThemeColorMeta(isDark) {
-    const color = isDark ? "#0D1117" : "#FAF9F6";
+    const color = isDark ? "#0B0E13" : "#FAF9F6";
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
       m.setAttribute("content", color);
     });
@@ -1234,6 +1441,7 @@
     progressMap = {};
     examHistory = [];
     stats = { total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0 };
+    clearNotice();
     closeSyncModal();
     initSupabaseAndLoad();
   }
@@ -1243,6 +1451,7 @@
       b.onclick = () => { showView(b.dataset.tab); renderAll(); };
     });
     $("btn-home-brand").onclick = () => { showView("home"); renderHome(); };
+    $("btn-stat-mistakes").onclick = () => { showView("mistakes"); renderMistakeBook(); };
 
     $("seg-instant").onclick = () => { revealAtEndPref = false; localStorage.setItem("onetake_reveal_end", "0"); renderHome(); };
     $("seg-exam").onclick = () => { revealAtEndPref = true; localStorage.setItem("onetake_reveal_end", "1"); renderHome(); };
@@ -1257,23 +1466,28 @@
         const extras = shuffle(window.QUESTIONS.filter((q) => !pool.some((p) => p.id === q.id))).slice(0, 12 - pool.length);
         pool = [...pool, ...extras];
       }
-      startSession({ mode: "srs", label: "間隔複習", questions: pool.slice(0, 15), revealAtEnd: false });
+      startSession({ mode: "srs", label: "到期複習", questions: pool.slice(0, 15), revealAtEnd: false });
     };
 
-    $("btn-mode-signs").onclick = () => startSession({ mode: "signs", label: "圖片路牌題", questions: shuffle(window.QUESTIONS.filter((q) => q.type === "image")).slice(0, 20), revealAtEnd: false });
-    $("btn-mode-text").onclick = () => startSession({ mode: "practice", label: "文字數字題", questions: shuffle(window.QUESTIONS.filter((q) => q.type === "text")).slice(0, 20), revealAtEnd: false });
-    $("btn-mode-traps").onclick = () => startSession({ mode: "practice", label: "高頻陷阱集", questions: shuffle(window.QUESTIONS.filter((q) => !!q.trapTag)).slice(0, 20), revealAtEnd: false });
+    $("btn-mode-signs").onclick = () => startSession({ mode: "signs", label: "圖片路牌", questions: shuffle(window.QUESTIONS.filter((q) => q.type === "image")).slice(0, 20), revealAtEnd: false });
+    $("btn-mode-text").onclick = () => startSession({ mode: "practice", label: "文字數字", questions: shuffle(window.QUESTIONS.filter((q) => q.type === "text")).slice(0, 20), revealAtEnd: false });
+    $("btn-mode-traps").onclick = () => startSession({ mode: "practice", label: "高頻陷阱", questions: shuffle(window.QUESTIONS.filter((q) => !!q.trapTag)).slice(0, 20), revealAtEnd: false });
 
-    const launchMistakes = () => {
+    $("btn-drill-mistakes-page").onclick = () => {
       const pool = getActiveMistakes().length ? getActiveMistakes() : getAllEverWrong();
       if (!pool.length) {
-        showNotice("暫無錯題紀錄，先考一份模擬試自動收集弱點。", { ctaText: "開始模擬試", onCta: launchExam });
+        showNotice("暫無錯題紀錄，先考一份模擬試自動收集盲點。", { ctaText: "開始模擬試", onCta: launchExam });
         return;
       }
-      startSession({ mode: "mistakes", label: "錯題復仇戰", questions: shuffle(pool).slice(0, 20), revealAtEnd: false });
+      startSession({ mode: "mistakes", label: "錯題特訓", questions: shuffle(pool).slice(0, 20), revealAtEnd: false });
     };
-    $("btn-mode-mistakes").onclick = launchMistakes;
-    $("btn-drill-mistakes-page").onclick = launchMistakes;
+
+    $("btn-toggle-dots").onclick = () => {
+      const panel = $("quiz-dots-panel");
+      const open = panel.hidden;
+      panel.hidden = !open;
+      $("btn-toggle-dots").setAttribute("aria-expanded", String(open));
+    };
 
     $("btn-quiz-exit").onclick = () => { showView("home"); renderHome(); };
     $("btn-prev-q").onclick = () => { if (session && session.index > 0) { session.index--; renderCurrentQuestion(); } };
@@ -1282,7 +1496,32 @@
     $("btn-summary-home").onclick = () => { showView("home"); renderHome(); };
 
     document.addEventListener("keydown", (e) => {
-      // Priority 1: Modal Escape + Focus Trap
+      if (!$("image-lightbox").hidden) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeLightbox();
+          return;
+        }
+        if (e.key === "Tab") {
+          const focusables = Array.from(
+            document.querySelectorAll('#image-lightbox button:not([disabled])')
+          );
+          if (!focusables.length) return;
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (e.shiftKey) {
+            if (document.activeElement === first || !$("image-lightbox").contains(document.activeElement)) {
+              e.preventDefault();
+              last.focus();
+            }
+          } else if (document.activeElement === last || !$("image-lightbox").contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+        return;
+      }
+
       if (!$("sync-modal").hidden) {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -1307,9 +1546,9 @@
         return;
       }
 
-      // Priority 2: Quiz keyboard shortcuts
       if ($("view-quiz").hidden || !session) return;
       if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+      if (document.activeElement?.matches?.("img.sign-img")) return;
       const k = e.key.toUpperCase();
       if (k === "A" || k === "1") handleOptionSelect("A");
       else if (k === "B" || k === "2") handleOptionSelect("B");
@@ -1320,11 +1559,44 @@
       }
     });
 
+    // Delegated click & keyboard zoom for all sign images across every view
+    document.addEventListener("click", (e) => {
+      const img =
+        e.target.closest("img.sign-img") ||
+        e.target.closest(".q-visual, .contrast-svg")?.querySelector("img.sign-img");
+      if (!img) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openLightbox(img);
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const img = document.activeElement?.matches?.("img.sign-img") ? document.activeElement : null;
+      if (!img) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openLightbox(img);
+    });
+
+    $("btn-close-lightbox").onclick = () => closeLightbox();
+    $("btn-zoom-toggle").onclick = () => {
+      const isZoomed = $("lightbox-pad").classList.contains("is-zoomed");
+      setLightboxZoom(!isZoomed);
+    };
+    $("lightbox-img").onclick = () => {
+      const isZoomed = $("lightbox-pad").classList.contains("is-zoomed");
+      setLightboxZoom(!isZoomed);
+    };
+    $("image-lightbox").onclick = (e) => {
+      if (e.target === $("image-lightbox") || e.target === $("lightbox-stage")) closeLightbox();
+    };
+
     $("btn-sound").onclick = () => {
       soundOn = !soundOn;
       localStorage.setItem("onetake_sound", soundOn ? "on" : "off");
       updateSoundBtn();
-      if (soundOn) playTone("correct", 2);
+      if (soundOn) playTone("correct", 1);
     };
 
     $("btn-theme").onclick = () => {
@@ -1337,6 +1609,12 @@
     $("btn-close-modal").onclick = () => closeSyncModal();
     $("sync-modal").onclick = (e) => { if (e.target === $("sync-modal")) closeSyncModal(); };
     $("btn-apply-profile").onclick = applyProfileFromModal;
+    $("btn-open-reset").onclick = openResetConfirm;
+    $("btn-cancel-reset").onclick = () => {
+      resetConfirmUI();
+      $("btn-open-reset").focus();
+    };
+    $("btn-confirm-reset").onclick = clearAllDatabase;
     $("input-profile-id").onkeydown = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();

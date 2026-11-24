@@ -4,219 +4,169 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>1TakePass · 香港私家車自動波 (1A) 筆試</title>
-  <meta name="description" content="香港運輸署《道路使用者守則》2020年版 私家車自動波 (1A) 甲部筆試模擬與錯題記憶系統。">
+  <meta name="description" content="香港運輸署現行《道路使用者守則》（涵蓋 2025–2026 新例）私家車自動波 (1A) 甲部筆試模擬與錯題系統。">
   <meta name="theme-color" content="#FAF9F6" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0D1117" media="(prefers-color-scheme: dark)">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cstyle%3Erect%7Bfill:%23007A4D%7D@media(prefers-color-scheme:dark)%7Brect%7Bfill:%2310B981%7D%7D%3C/style%3E%3Crect width='32' height='32' rx='8'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='%23fff' font-family='system-ui,sans-serif' font-size='16' font-weight='800'%3E1%E2%9C%93%3C/text%3E%3C/svg%3E">
+  <meta name="theme-color" content="#0B0E13" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cstyle%3Erect%7Bfill:%23007A4D%7D@media(prefers-color-scheme:dark)%7Brect%7Bfill:%2310B981%7D%7D%3C/style%3E%3Crect width='32' height='32' rx='8'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='%23fff' font-family='system-ui,sans-serif' font-size='16' font-weight='700'%3E1%E2%9C%93%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <a class="skip-link" href="#app-root">跳至主要內容</a>
   <canvas id="confetti-canvas" aria-hidden="true"></canvas>
 
-  <div class="nav-shell">
-    <header class="floating-nav">
-      <div class="nav-row">
-        <button class="brand" id="btn-home-brand" type="button" aria-label="返回主頁">
-          <span class="brand-mark" aria-hidden="true">1✓</span>
-          <span class="brand-copy">
-            <strong>1TakePass</strong>
-            <span>1A 自動波筆試</span>
-          </span>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="brand" id="btn-home-brand" type="button" aria-label="返回練習主頁">
+        <span class="brand-mark" aria-hidden="true">1✓</span>
+        <strong class="brand-name">1TakePass</strong>
+      </button>
+
+      <nav class="nav-tabs" aria-label="主導覽">
+        <button class="nav-tab is-active" data-tab="home" type="button">練習</button>
+        <button class="nav-tab" data-tab="mistakes" type="button">
+          <span>錯題</span>
+          <span class="nav-badge tnum" id="nav-mistake-badge" hidden>0</span>
         </button>
+        <button class="nav-tab" data-tab="study" type="button">對比卡</button>
+        <button class="nav-tab" data-tab="history" type="button">紀錄</button>
+      </nav>
 
-        <nav class="nav-tabs" aria-label="主導覽">
-          <button class="nav-tab is-active" data-tab="home" type="button">
-            <span class="tab-ic" data-icon="home"></span>
-            <span>考場</span>
-          </button>
-          <button class="nav-tab" data-tab="mistakes" type="button">
-            <span class="tab-ic" data-icon="bookX"></span>
-            <span>錯題本</span>
-            <span class="nav-badge" id="nav-mistake-badge" hidden>0</span>
-          </button>
-          <button class="nav-tab" data-tab="study" type="button">
-            <span class="tab-ic" data-icon="columns"></span>
-            <span>對比卡</span>
-          </button>
-          <button class="nav-tab" data-tab="history" type="button">
-            <span class="tab-ic" data-icon="chart"></span>
-            <span>紀錄</span>
-          </button>
-        </nav>
-
-        <div class="nav-tools">
-          <button class="sync-pill" id="btn-sync" type="button" aria-label="雲端同步設定">
-            <span class="sync-dot" id="sync-dot"></span>
-            <span id="sync-label">同步中</span>
-          </button>
-          <button class="icon-btn" id="btn-sound" type="button" aria-label="切換音效" title="切換音效"></button>
-          <button class="icon-btn" id="btn-theme" type="button" aria-label="切換深淺色主題" title="切換深淺色主題"></button>
-        </div>
+      <div class="nav-tools">
+        <button class="sync-btn" id="btn-sync" type="button" aria-label="雲端同步設定" title="雲端同步設定">
+          <span class="sync-dot" id="sync-dot"></span>
+          <span class="sync-text" id="sync-label">同步中</span>
+        </button>
+        <button class="icon-btn" id="btn-sound" type="button" aria-label="切換音效" title="切換音效"></button>
+        <button class="icon-btn" id="btn-theme" type="button" aria-label="切換深淺色主題" title="切換深淺色主題"></button>
       </div>
-    </header>
-  </div>
+    </div>
+  </header>
 
   <main class="container" id="app-root" tabindex="-1">
     <div class="app-notice" id="app-notice" role="status" aria-live="polite" hidden></div>
 
+    <!-- ==================== HOME ==================== -->
     <section class="view" id="view-home">
-      <div class="hero-bento">
-        <div class="hero-main">
-          <div class="spec-strip">
-            <span class="chip chip-emerald">2020 守則</span>
-            <span class="chip chip-cobalt">私家車 1A 自動波</span>
-            <span class="chip chip-neutral">無限時</span>
+      <section class="panel home-launch">
+        <div class="launch-top">
+          <div>
+            <h1>1A 自動波甲部筆試</h1>
+            <p class="launch-sub">20 題三選一 · 16 題及格 · 現行《道路使用者守則》（涵蓋 2025–2026 新例）</p>
           </div>
-
-          <h1 id="hero-greeting">模擬甲部筆試</h1>
-          <p class="hero-meta">20 題三選一 · 16 題及格 · 逐題正誤解析與書本頁數</p>
-
-          <div class="cta-row">
-            <button class="btn btn-primary btn-lg" id="btn-start-exam" type="button">
-              <span class="btn-ic" data-icon="play"></span>
-              <span>開始模擬試</span>
-            </button>
-            <button class="btn btn-secondary btn-lg" id="btn-start-srs" type="button">
-              <span class="btn-ic" data-icon="refresh"></span>
-              <span>間隔複習</span>
-              <span class="count-dot" id="home-due-count">0</span>
-            </button>
-          </div>
-
           <div class="segment-wrap" role="group" aria-label="揭曉答案模式">
-            <button class="seg-btn is-active" id="seg-instant" type="button" aria-pressed="true">即時拆解</button>
-            <button class="seg-btn" id="seg-exam" type="button" aria-pressed="false">交卷後揭曉</button>
+            <button class="seg-btn is-active" id="seg-instant" type="button" aria-pressed="true">即時解析</button>
+            <button class="seg-btn" id="seg-exam" type="button" aria-pressed="false">交卷揭曉</button>
           </div>
         </div>
 
-        <aside class="readiness-card" aria-label="應考把握度">
-          <div class="ring-box">
-            <svg class="ring-svg" viewBox="0 0 120 120" aria-hidden="true">
-              <circle class="ring-track" cx="60" cy="60" r="48"/>
-              <circle class="ring-bar" id="readiness-arc" cx="60" cy="60" r="48" stroke-dasharray="301.59" stroke-dashoffset="301.59"/>
-            </svg>
-            <div class="ring-val">
-              <strong class="tnum" id="readiness-pct">0%</strong>
-              <span>把握度</span>
+        <div class="cta-row">
+          <button class="btn btn-primary btn-lg" id="btn-start-exam" type="button">
+            <span class="btn-ic" data-icon="play"></span>
+            <span>開始模擬試</span>
+          </button>
+          <button class="btn btn-secondary btn-lg" id="btn-start-srs" type="button">
+            <span>到期複習</span>
+            <span class="pill-count tnum" id="home-due-count" hidden>0</span>
+          </button>
+        </div>
+
+        <div class="stats-strip" aria-label="學習進度">
+          <div class="stat-item">
+            <span class="stat-label">應考把握度</span>
+            <div class="stat-readiness">
+              <strong class="stat-value tnum" id="readiness-pct">0%</strong>
+              <span class="mini-track" aria-hidden="true"><span class="mini-fill" id="readiness-bar-fill" style="transform:scaleX(0)"></span></span>
             </div>
           </div>
-          <div class="rank-label" id="rank-pill">起步階段</div>
-        </aside>
-      </div>
-
-      <div class="metrics-bar" aria-label="學習指標">
-        <div class="metric-tile">
-          <span class="metric-k">已牢記</span>
-          <strong class="metric-v tnum" id="stat-mastered">0 / 80</strong>
-        </div>
-        <div class="metric-tile">
-          <span class="metric-k">最高連中</span>
-          <strong class="metric-v tnum" id="stat-best-combo">0</strong>
-        </div>
-        <div class="metric-tile">
-          <span class="metric-k">及格次數</span>
-          <strong class="metric-v tnum" id="stat-exams-passed">0</strong>
-        </div>
-        <div class="metric-tile metric-alert">
-          <span class="metric-k">待清錯題</span>
-          <strong class="metric-v tnum" id="stat-active-mistakes">0</strong>
-        </div>
-      </div>
-
-      <section class="group-section">
-        <div class="sec-head">
-          <h2>專項訓練</h2>
-          <span class="sec-sub">按題型精準操練</span>
-        </div>
-        <div class="mode-grid">
-          <button class="mode-tile" id="btn-mode-signs" type="button">
-            <span class="tile-ic ic-red" data-icon="alertTri"></span>
-            <div class="tile-body">
-              <div class="tile-top">
-                <strong>圖片路牌題</strong>
-                <span class="tile-num tnum" id="count-image-qs">46 題</span>
-              </div>
-              <small>標誌 · 燈號 · 道路標記 · 圖解</small>
-            </div>
-          </button>
-
-          <button class="mode-tile" id="btn-mode-text" type="button">
-            <span class="tile-ic ic-cobalt" data-icon="fileText"></span>
-            <div class="tile-body">
-              <div class="tile-top">
-                <strong>文字數字題</strong>
-                <span class="tile-num tnum" id="count-text-qs">34 題</span>
-              </div>
-              <small>酒駕 · 距離 · P 牌 · 緊急處理</small>
-            </div>
-          </button>
-
-          <button class="mode-tile" id="btn-mode-traps" type="button">
-            <span class="tile-ic ic-amber" data-icon="alertCircle"></span>
-            <div class="tile-body">
-              <div class="tile-top">
-                <strong>高頻陷阱集</strong>
-                <span class="tile-num tnum" id="count-trap-qs">54 題</span>
-              </div>
-              <small>自動波重點 · 易中伏考點</small>
-            </div>
-          </button>
-
-          <button class="mode-tile" id="btn-mode-mistakes" type="button">
-            <span class="tile-ic ic-emerald" data-icon="target"></span>
-            <div class="tile-body">
-              <div class="tile-top">
-                <strong>錯題復仇戰</strong>
-                <span class="tile-num tnum" id="count-mistake-qs">0 題</span>
-              </div>
-              <small>專攻未熟錯題，逐條清零</small>
-            </div>
+          <div class="stat-item">
+            <span class="stat-label">已熟習</span>
+            <strong class="stat-value tnum" id="stat-mastered">0 / 300</strong>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">模擬及格</span>
+            <strong class="stat-value tnum" id="stat-exams-passed">0 次</strong>
+          </div>
+          <button class="stat-item stat-btn" id="btn-stat-mistakes" type="button">
+            <span class="stat-label">待清錯題</span>
+            <strong class="stat-value tnum" id="stat-active-mistakes">0</strong>
           </button>
         </div>
       </section>
 
       <section class="group-section">
         <div class="sec-head">
-          <h2>守則章節</h2>
-          <span class="sec-sub">點擊逐章溫習</span>
+          <h2>專項練習</h2>
         </div>
-        <div class="chapter-grid" id="chapter-grid"></div>
+        <div class="quick-grid">
+          <button class="quick-row" id="btn-mode-signs" type="button">
+            <div class="quick-main">
+              <strong>圖片路牌</strong>
+              <span class="quick-desc">標誌 · 燈號 · 道路標記</span>
+            </div>
+            <span class="row-meta tnum" id="count-image-qs">87 題</span>
+          </button>
+          <button class="quick-row" id="btn-mode-text" type="button">
+            <div class="quick-main">
+              <strong>文字數字</strong>
+              <span class="quick-desc">酒駕 · 距離 · P 牌 · 規則</span>
+            </div>
+            <span class="row-meta tnum" id="count-text-qs">213 題</span>
+          </button>
+          <button class="quick-row" id="btn-mode-traps" type="button">
+            <div class="quick-main">
+              <strong>高頻陷阱</strong>
+              <span class="quick-desc">歷屆必考 · 新例 · 易錯字眼</span>
+            </div>
+            <span class="row-meta tnum" id="count-trap-qs">274 題</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="group-section">
+        <div class="sec-head">
+          <h2>按章節溫習</h2>
+        </div>
+        <div class="chapter-list" id="chapter-grid"></div>
       </section>
     </section>
 
+    <!-- ==================== QUIZ ==================== -->
     <section class="view view-narrow" id="view-quiz" hidden>
-      <div class="quiz-bar">
-        <button class="btn btn-ghost btn-sm" id="btn-quiz-exit" type="button">
-          <span class="btn-ic" data-icon="chevLeft"></span>
-          <span>退出</span>
-        </button>
-        <div class="quiz-pills">
-          <span class="chip chip-cobalt" id="quiz-mode-label">模擬試</span>
-          <span class="chip chip-neutral">無限時</span>
-          <span class="combo-chip tnum" id="quiz-combo-pill" hidden>
-            <span class="btn-ic" data-icon="flame"></span>
-            <span id="quiz-combo-num">0</span> 連中
-          </span>
-        </div>
-      </div>
+      <div class="quiz-header">
+        <div class="quiz-bar">
+          <div class="quiz-left">
+            <button class="text-btn" id="btn-quiz-exit" type="button">
+              <span class="btn-ic" data-icon="chevLeft"></span>
+              <span>退出</span>
+            </button>
+            <span class="sep-dot" aria-hidden="true">·</span>
+            <span class="quiz-mode" id="quiz-mode-label">模擬試</span>
+          </div>
 
-      <div class="progress-card">
-        <div class="progress-meta tnum">
-          <span id="quiz-progress-text">1 / 20</span>
-          <span id="quiz-score-live">答對 0</span>
+          <div class="quiz-right tnum">
+            <span class="combo-tag" id="quiz-combo-pill" hidden><span id="quiz-combo-num">0</span> 連中</span>
+            <span class="score-live" id="quiz-score-live">答對 0</span>
+            <button class="jump-toggle" id="btn-toggle-dots" type="button" aria-expanded="false" aria-controls="quiz-dots-panel">
+              <span id="quiz-progress-text">1 / 20</span>
+              <span class="btn-ic chev-ic" data-icon="chevDown"></span>
+            </button>
+          </div>
         </div>
+
         <div class="progress-track">
           <div class="progress-bar" id="quiz-progress-fill" style="transform:scaleX(0)"></div>
         </div>
-        <div class="q-dots" id="quiz-dots" aria-label="題號跳轉"></div>
+
+        <div class="dots-drawer" id="quiz-dots-panel" hidden>
+          <div class="q-dots" id="quiz-dots" aria-label="題號跳轉"></div>
+        </div>
       </div>
 
       <article class="q-card" id="question-card">
-        <div class="q-meta-row" id="q-badges"></div>
+        <div class="q-meta-line" id="q-meta"></div>
 
         <div class="q-visual" id="q-visual" hidden></div>
 
@@ -224,78 +174,80 @@
 
         <div class="options-list" id="options-list" role="radiogroup" aria-label="選項"></div>
 
-        <div class="emotion-strip" id="emotion-banner" hidden aria-live="polite">
-          <span class="emotion-ic" id="emotion-icon"></span>
-          <div class="emotion-copy">
-            <strong id="emotion-badge"></strong>
-            <span id="emotion-text"></span>
-          </div>
-        </div>
-
-        <div class="autopsy" id="autopsy-panel" hidden>
-          <div class="autopsy-row row-right">
-            <div class="autopsy-label">正確解析</div>
-            <p id="autopsy-right-text"></p>
+        <!-- Unified, minimal post-answer explanation block -->
+        <div class="explain-card" id="explain-panel" hidden aria-live="polite">
+          <div class="explain-head">
+            <span class="explain-status" id="explain-status"></span>
+            <span class="explain-page tnum" id="explain-page"></span>
           </div>
 
-          <div class="autopsy-row row-wrong">
-            <div class="autopsy-label">錯誤選項盲點</div>
-            <ul class="wrong-list" id="autopsy-wrong-list"></ul>
-          </div>
+          <p class="explain-wrong-self" id="explain-chosen-wrong" hidden></p>
+          <p class="explain-main" id="explain-right-text"></p>
+          <p class="explain-hook" id="explain-hook" hidden>
+            <span class="hook-k">口訣</span>
+            <span id="explain-hook-text"></span>
+          </p>
 
-          <div class="autopsy-row row-source">
-            <div class="source-top">
-              <span class="autopsy-label">守則出處</span>
-              <span class="page-pill tnum" id="autopsy-page-badge">第 54 頁</span>
+          <details class="fold" id="explain-details">
+            <summary class="fold-trigger">
+              <span>出處原文與其他選項</span>
+              <span class="fold-chev" data-icon="chevDown"></span>
+            </summary>
+            <div class="fold-body">
+              <ul class="other-wrong-list" id="explain-other-wrong"></ul>
+              <div class="source-block">
+                <div class="source-loc" id="explain-source-meta"></div>
+                <blockquote class="source-quote" id="explain-source-quote"></blockquote>
+              </div>
             </div>
-            <div class="source-loc" id="autopsy-source-meta"></div>
-            <blockquote class="source-quote" id="autopsy-source-quote"></blockquote>
-          </div>
+          </details>
 
-          <div class="autopsy-row row-hook">
-            <div class="autopsy-label">記法口訣</div>
-            <p id="autopsy-hook-text"></p>
-          </div>
-
-          <div class="autopsy-row row-reflect" id="autopsy-reflect" hidden>
-            <div class="autopsy-label">標記錯因 · 個人筆記</div>
-            <div class="reason-chips" id="reason-chips"></div>
-            <div class="note-row">
-              <input type="text" id="input-personal-note" class="text-input" placeholder="例如：紅交叉＝連落客都唔得…" maxlength="120" autocomplete="off" aria-label="個人筆記">
-              <button class="btn btn-secondary btn-sm" id="btn-save-note" type="button">儲存</button>
+          <details class="fold reflect-fold" id="reflect-details" hidden>
+            <summary class="fold-trigger">
+              <span>錯因與筆記</span>
+              <span class="reflect-preview" id="reflect-summary-badge" hidden></span>
+              <span class="fold-chev" data-icon="chevDown"></span>
+            </summary>
+            <div class="fold-body">
+              <div class="reason-chips" id="reason-chips"></div>
+              <div class="note-row">
+                <input type="text" id="input-personal-note" class="text-input" placeholder="寫低防錯提醒…" maxlength="120" autocomplete="off" aria-label="個人筆記">
+                <button class="btn btn-secondary btn-sm" id="btn-save-note" type="button">儲存</button>
+              </div>
+              <div class="saved-hint" id="note-saved-hint" role="status" aria-live="polite" hidden>已儲存</div>
             </div>
-            <div class="saved-hint" id="note-saved-hint" role="status" aria-live="polite" hidden>已同步至雲端</div>
-          </div>
+          </details>
         </div>
 
         <div class="quiz-foot">
           <button class="btn btn-ghost btn-sm" id="btn-prev-q" type="button" hidden>上一題</button>
           <div class="spacer"></div>
           <button class="btn btn-primary" id="btn-next-q" type="button" hidden>下一題</button>
-          <button class="btn btn-cobalt" id="btn-submit-exam" type="button" hidden>交卷睇詳解</button>
+          <button class="btn btn-cobalt" id="btn-submit-exam" type="button" hidden>交卷</button>
         </div>
       </article>
     </section>
 
+    <!-- ==================== SUMMARY ==================== -->
     <section class="view" id="view-summary" hidden>
-      <div class="summary-card" id="summary-hero">
+      <div class="panel summary-card" id="summary-hero">
         <div class="summary-top">
           <div>
-            <span class="summary-badge" id="summary-status-pill">及格</span>
+            <span class="status-tag" id="summary-status-pill">及格</span>
             <h1 class="tnum" id="summary-score-title">18 / 20</h1>
             <p class="summary-sub" id="summary-message"></p>
           </div>
           <div class="summary-actions">
-            <button class="btn btn-danger" id="btn-retry-session-mistakes" type="button" hidden>重做今次錯題</button>
+            <button class="btn btn-danger" id="btn-retry-session-mistakes" type="button" hidden>重做錯題</button>
             <button class="btn btn-primary" id="btn-new-exam" type="button">再考一卷</button>
-            <button class="btn btn-ghost" id="btn-summary-home" type="button">主頁</button>
+            <button class="btn btn-ghost" id="btn-summary-home" type="button">返回練習</button>
           </div>
         </div>
       </div>
 
       <section class="group-section">
         <div class="sec-head wrap">
-          <h2>全卷拆解</h2>
+          <h2>題目回顧</h2>
           <div class="filter-bar" id="summary-filters">
             <button class="filter-btn is-active" data-sfilter="all" type="button">全部</button>
             <button class="filter-btn" data-sfilter="wrong" type="button">只看錯題</button>
@@ -306,23 +258,24 @@
       </section>
     </section>
 
+    <!-- ==================== MISTAKES ==================== -->
     <section class="view" id="view-mistakes" hidden>
-      <section class="surface">
+      <section class="panel">
         <div class="sec-head wrap">
           <div>
-            <h2>錯題記憶階梯</h2>
-            <span class="sec-sub">Leitner 間隔重複 · 答錯歸零、連啱升級</span>
+            <h2>間隔記憶進度</h2>
+            <span class="sec-sub">答錯歸零 · 連啱升級</span>
           </div>
           <button class="btn btn-primary btn-sm" id="btn-drill-mistakes-page" type="button">開始錯題特訓</button>
         </div>
 
         <div class="leitner-strip" id="leitner-boxes"></div>
-        <div class="reason-bar" id="reason-stats"></div>
+        <div class="reason-bar" id="reason-stats" hidden></div>
       </section>
 
       <section class="group-section">
         <div class="sec-head wrap">
-          <h2>錯題檔案</h2>
+          <h2>錯題紀錄</h2>
           <div class="filter-bar" id="mistake-filters">
             <button class="filter-btn is-active" data-mfilter="active" type="button">待擊破</button>
             <button class="filter-btn" data-mfilter="all" type="button">全部曾錯</button>
@@ -333,40 +286,18 @@
       </section>
     </section>
 
+    <!-- ==================== CONTRAST STUDY ==================== -->
     <section class="view" id="view-study" hidden>
       <section class="group-section">
         <div class="sec-head">
           <h2>8 組易混淆對比卡</h2>
-          <span class="sec-sub">並排睇清分別，一秒防中伏</span>
+          <span class="sec-sub">並排睇清分別</span>
         </div>
         <div class="contrast-grid" id="contrast-grid"></div>
       </section>
-
-      <section class="group-section">
-        <div class="sec-head">
-          <h2>記憶機制與 1A 筆試規格</h2>
-        </div>
-        <div class="compact-spec-grid">
-          <div class="mini-spec">
-            <strong>超校正反思</strong>
-            <span>答錯即標錯因＋寫筆記，記憶深 2 倍</span>
-          </div>
-          <div class="mini-spec">
-            <strong>間隔重複</strong>
-            <span>10 分 → 1 日 → 3 日 → 7 日自動重出</span>
-          </div>
-          <div class="mini-spec">
-            <strong>即時重測</strong>
-            <span>完卷一鍵重做錯題，鎖死長期記憶</span>
-          </div>
-          <div class="mini-spec">
-            <strong>運輸署 1A 筆試</strong>
-            <span>20 題三選一 · 16 題及格 · 2020 年版守則</span>
-          </div>
-        </div>
-      </section>
     </section>
 
+    <!-- ==================== HISTORY ==================== -->
     <section class="view" id="view-history" hidden>
       <section class="group-section">
         <div class="sec-head wrap">
@@ -381,24 +312,59 @@
   <div class="modal-backdrop" id="sync-modal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="sync-modal-title">
       <div class="modal-head">
-        <h3 id="sync-modal-title">雲端同步設定</h3>
+        <h3 id="sync-modal-title">同步與資料管理</h3>
         <button class="icon-btn" id="btn-close-modal" type="button" aria-label="關閉" data-icon="x"></button>
       </div>
-      <p class="modal-desc">共用 Supabase 雲端資料庫（獨立 <code>onetake_*</code> 資料表）。輸入相同代號即跨裝置同步。</p>
+      <p class="modal-desc">輸入相同同步代號即可跨裝置同步進度與錯題筆記。</p>
       <div class="field-group">
         <label for="input-profile-id">同步代號</label>
         <div class="note-row">
-          <input type="text" id="input-profile-id" class="text-input" value="default" maxlength="32" pattern="[a-zA-Z0-9_\-]+" spellcheck="false" autocomplete="off" autocapitalize="none" placeholder="例如：default…">
+          <input type="text" id="input-profile-id" class="text-input" value="default" maxlength="32" pattern="[a-zA-Z0-9_\-]+" spellcheck="false" autocomplete="off" autocapitalize="none" placeholder="例如：default">
           <button class="btn btn-primary btn-sm" id="btn-apply-profile" type="button">套用</button>
         </div>
       </div>
       <div class="sync-detail" id="sync-status-detail"></div>
+
+      <div class="danger-zone">
+        <div class="danger-row" id="reset-trigger-row">
+          <div class="danger-copy">
+            <strong>重設全部資料</strong>
+            <span>清除目前代號的雲端及本機進度、錯題與考試紀錄</span>
+          </div>
+          <button class="btn btn-danger-outline btn-sm" id="btn-open-reset" type="button">清除全部資料</button>
+        </div>
+
+        <div class="reset-confirm" id="reset-confirm-box" hidden>
+          <p class="reset-warn" id="reset-confirm-copy"></p>
+          <p class="reset-error" id="reset-error-msg" role="alert" hidden></p>
+          <div class="reset-actions">
+            <button class="btn btn-danger btn-sm" id="btn-confirm-reset" type="button">確認清除全部資料</button>
+            <button class="btn btn-ghost btn-sm" id="btn-cancel-reset" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lightbox-backdrop" id="image-lightbox" hidden>
+    <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-labelledby="lightbox-caption">
+      <div class="lightbox-bar">
+        <span class="lightbox-caption" id="lightbox-caption"></span>
+        <div class="lightbox-actions">
+          <button class="lightbox-btn" id="btn-zoom-toggle" type="button" aria-label="切換放大倍率" title="切換放大倍率"></button>
+          <button class="lightbox-btn" id="btn-close-lightbox" type="button" aria-label="關閉放大圖片" title="關閉 (Esc)" data-icon="x"></button>
+        </div>
+      </div>
+      <div class="lightbox-stage" id="lightbox-stage">
+        <div class="lightbox-pad" id="lightbox-pad">
+          <img class="lightbox-img" id="lightbox-img" src="" alt="">
+        </div>
+      </div>
     </div>
   </div>
 
   <footer class="site-footer">
-    <span>1TakePass · 運輸署《道路使用者守則》2020 年 6 月版</span>
-    <span id="footer-sync-note"></span>
+    <span>《道路使用者守則》2020 年 6 月版 · 行動代號 V~~~~~1TP</span>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
