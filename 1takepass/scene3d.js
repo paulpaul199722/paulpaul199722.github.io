@@ -446,8 +446,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   const trafficGroup = new THREE.Group();
   trafficGroup.visible = false;
   const tlAssembly = new THREE.Group();
-  tlAssembly.position.set(-2.22, 0, -2.6);
-  tlAssembly.rotation.y = 0.24;
+  // Planted properly OUTSIDE the left curb on the pavement (curb ends at x = -2.58)
+  tlAssembly.position.set(-2.82, 0, -3.5);
+  tlAssembly.rotation.y = 0.08;
 
   const tlPost = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 2.25, 10), darkMetalMat);
   tlPost.position.set(0, 1.12, 0);
@@ -495,27 +496,29 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   // Independent white stop line across the road (used by traffic lights AND stop_oct!)
   const stopLineMesh = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth - 0.5, 0.24), edgeLineMat);
   stopLineMesh.rotation.x = -Math.PI / 2;
-  stopLineMesh.position.set(0, 0.012, -1.65);
+  stopLineMesh.position.set(0, 0.012, -1.95);
   stopLineMesh.visible = false;
   scenarioRoot.add(stopLineMesh);
 
-  // 2. 3D Roadside Official PDF Signpost (displays the ACTUAL official PDF sign texture in 3D!)
+  // 2. 3D Roadside Official PDF Signpost (planted outside curb on left pavement; scrolls with road when moving!)
   const signPostGroup = new THREE.Group();
   signPostGroup.visible = false;
   const spPoleMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4, metalness: 0.5 });
-  const spPole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 2.05, 10), spPoleMat);
-  spPole.position.set(0, 1.02, 0);
+  const spBase = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.12, 10), curbMat);
+  spBase.position.set(0, 0.06, 0);
+  const spPole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.92, 10), spPoleMat);
+  spPole.position.set(0, 0.96, 0);
   spPole.castShadow = true;
-  const spBackMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.5 });
+  const spBackMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.45, metalness: 0.35 });
   const spFaceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.32, metalness: 0.02 });
-  const spBoard = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 0.05), [
+  const spBoard = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 0.045), [
     spBackMat, spBackMat, spBackMat, spBackMat, spFaceMat, spBackMat
   ]);
-  spBoard.position.set(0, 1.88, 0.03);
+  spBoard.position.set(0, 1.66, 0.03);
   spBoard.castShadow = true;
-  signPostGroup.add(spPole, spBoard);
-  signPostGroup.position.set(-2.15, 0, -2.75);
-  signPostGroup.rotation.y = 0.28;
+  signPostGroup.add(spBase, spPole, spBoard);
+  signPostGroup.position.set(-2.95, 0, -7.2);
+  signPostGroup.rotation.y = 0.12;
   scenarioRoot.add(signPostGroup);
 
   // 3. 3D Zebra Crossing + Glowing Belisha Beacons + Animated Pedestrian
@@ -524,16 +527,16 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   const zebraMat = new THREE.MeshStandardMaterial({ map: zebraTex, roughness: 0.85 });
   const zebraRoad = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth - 0.4, 1.55), zebraMat);
   zebraRoad.rotation.x = -Math.PI / 2;
-  zebraRoad.position.set(0, 0.012, -2.55);
+  zebraRoad.position.set(0, 0.012, -3.15);
 
   const beaconGlowMat = new THREE.MeshStandardMaterial({
     color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 1.4, roughness: 0.25
   });
-  [-2.42, 2.42].forEach((bx) => {
+  [-2.82, 2.82].forEach((bx) => {
     const bp = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 1.85, 8), darkMetalMat);
-    bp.position.set(bx, 0.92, -2.55);
+    bp.position.set(bx, 0.92, -3.15);
     const globe = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 12), beaconGlowMat);
-    globe.position.set(bx, 1.94, -2.55);
+    globe.position.set(bx, 1.94, -3.15);
     zebraGroup.add(bp, globe);
   });
 
@@ -552,7 +555,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   pedHead.position.y = 0.96;
   pedHead.castShadow = true;
   pedGroup.add(pedBody, pedHead);
-  pedGroup.position.set(-1.3, 0, -2.55);
+  pedGroup.position.set(-1.3, 0, -3.15);
   zebraGroup.add(zebraRoad, pedGroup);
   scenarioRoot.add(zebraGroup);
 
@@ -705,18 +708,18 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   npcCarGroup.position.set(-1.05, 0, -4.6);
   scenarioRoot.add(npcCarGroup);
 
-  // 10. 3D Roundabout Central Island
+  // 10. 3D Roundabout Central Island (positioned clearly ahead of yield line!)
   const roundaboutGroup = new THREE.Group();
   roundaboutGroup.visible = false;
   const rbIsland = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.45, 1.55, 0.24, 28),
+    new THREE.CylinderGeometry(1.5, 1.6, 0.24, 28),
     new THREE.MeshStandardMaterial({ color: 0x2d7d57, roughness: 0.9 })
   );
-  rbIsland.position.set(0, 0.12, -4.2);
+  rbIsland.position.set(0, 0.12, -6.2);
   rbIsland.receiveShadow = true;
-  const rbCurb = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.08, 10, 32), curbMat);
+  const rbCurb = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.08, 10, 32), curbMat);
   rbCurb.rotation.x = Math.PI / 2;
-  rbCurb.position.set(0, 0.08, -4.2);
+  rbCurb.position.set(0, 0.08, -6.2);
   roundaboutGroup.add(rbIsland, rbCurb);
   scenarioRoot.add(roundaboutGroup);
 
@@ -993,15 +996,15 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     spFaceMat.needsUpdate = true;
     const img = tex?.image;
     if (img && img.width && img.height) {
-      const ar = THREE.MathUtils.clamp(img.width / img.height, 0.58, 1.75);
-      const maxDim = 1.14;
+      const ar = THREE.MathUtils.clamp(img.width / img.height, 0.62, 1.65);
+      const maxDim = 0.88;
       const bw = ar >= 1 ? maxDim : maxDim * ar;
       const bh = ar >= 1 ? maxDim / ar : maxDim;
       spBoard.scale.set(bw, bh, 1);
-      spBoard.position.y = 1.38 + bh * 0.48;
+      spBoard.position.y = 1.32 + bh * 0.45;
     } else {
-      spBoard.scale.set(1.06, 1.06, 1);
-      spBoard.position.y = 1.88;
+      spBoard.scale.set(0.84, 0.84, 1);
+      spBoard.position.y = 1.66;
     }
   }
 
@@ -1040,20 +1043,25 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   function resetAllScenarioProps() {
     latestSignReqKey = null;
     trafficGroup.visible = false;
+    trafficGroup.position.set(0, 0, 0);
     stopLineMesh.visible = false;
+    stopLineMesh.position.set(0, 0.012, -1.95);
     tlArrowBox.visible = false;
     wigwagBox.visible = false;
     signPostGroup.visible = false;
-    signPostGroup.position.set(-2.15, 0, -2.75);
-    signPostGroup.rotation.y = 0.28;
+    signPostGroup.position.set(-2.95, 0, -7.2);
+    signPostGroup.rotation.y = 0.12;
     zebraGroup.visible = false;
     yellowBoxGroup.visible = false;
     doubleWhiteGroup.visible = false;
+    dwLeftBroken.position.z = 0;
     roadworksGroup.visible = false;
+    roadworksGroup.position.set(0, 0, -4.2);
     emergencyGroup.visible = false;
     busGroup.visible = false;
     npcCarGroup.visible = false;
     roundaboutGroup.visible = false;
+    roundaboutGroup.position.set(0, 0, 0);
     tunnelGroup.visible = false;
     rainInst.visible = false;
     curbYellow2.visible = false;
@@ -1229,7 +1237,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       case "roundabout":
         roundaboutGroup.visible = true;
         gantry.visible = false;
-        // Neutral center approach before answering so right/left lane questions aren't spoiled!
+        // Calmly yield at roundabout entry before answering (no lane spoiler, zero floating island!)
+        state.scenarioStopped = true;
+        state.brakeTimer = 99;
         state.targetX = 0;
         state.scenarioLabel = "實境：香港兩線迴旋處";
         break;
@@ -1348,10 +1358,13 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         break;
     }
 
-    // Avoid overlap if both a traffic signal AND a warning signpost appear together
+    // Ground roadside signpost cleanly outside curb on pavement (right side if traffic light occupies left)
     if (trafficGroup.visible && signPostGroup.visible) {
-      signPostGroup.position.set(2.15, 0, -2.75);
-      signPostGroup.rotation.y = -0.24;
+      signPostGroup.position.set(3.05, 0, state.scenarioStopped ? -4.4 : -7.2);
+      signPostGroup.rotation.y = -0.14;
+    } else if (signPostGroup.visible) {
+      signPostGroup.position.set(-3.12, 0, state.scenarioStopped ? -4.4 : -6.8);
+      signPostGroup.rotation.y = 0.14;
     }
 
     // Restore tlHead visibility unless wigwag explicitly hid it
@@ -1361,6 +1374,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     }
     state.activeQuestionId = q.id;
     state.activeQuestion = q;
+    snapQuizCameraForScenario();
     updateHudUI();
     if (prefersReducedMotion()) renderSingleFrame();
   }
@@ -1480,12 +1494,25 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   });
 
   // ==================== MOUNTING & CAMERA MODES ====================
+  function snapQuizCameraForScenario() {
+    if (state.mode !== "quiz") return;
+    if (state.scenario === "slope_hill" && state.scenarioStopped) {
+      // Side-kerb 3/4 view so tilted hill, kerb (or lack of kerb) and front wheel turn angle are crystal clear!
+      camera.position.set(-3.15, 1.52, 3.15);
+      controls.target.set(-1.15, 0.42, -0.25);
+    } else {
+      // Clean HK driving-simulator rear chase perspective: car cleanly centered, left pavement & road ahead 100% unobstructed!
+      camera.position.set(-1.15, 1.85, 6.1);
+      controls.target.set(-0.55, 0.45, -3.0);
+    }
+    controls.enabled = true;
+    controls.update();
+  }
+
   function snapCameraForMode(mode) {
     if (mode === "quiz") {
-      // Elevated behind-right-quarter driving perspective so road ahead, signs, lights & car are ALL crystal clear!
-      camera.position.set(2.85, 2.05, 4.35);
-      controls.target.set(-0.35, 0.72, -1.35);
-      controls.enabled = true;
+      snapQuizCameraForScenario();
+      return;
     } else if (mode === "summary") {
       camera.position.set(3.2, 2.05, 4.1);
       controls.target.set(0, 0.72, 0.15);
@@ -1614,6 +1641,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
             : "實境：下斜靠壆 · 前輪向左扭";
       } else if (kind === "roundabout") {
         const goRight = /轉右|掉頭/.test(p);
+        state.scenarioStopped = false;
+        state.brakeTimer = 0;
         state.lane = goRight ? "right" : "left";
         state.targetX = goRight ? RIGHT_LANE_X : LEFT_LANE_X;
         state.blinkerDir = goRight ? 1 : -1;
@@ -1649,7 +1678,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
           state.boostTimer = 0.7;
         }
       } else if (kind === "roadside_sign_3d" && s === "stop_oct") {
+        stopLineMesh.position.set(0, 0.012, -1.95);
         stopLineMesh.visible = true;
+        signPostGroup.position.set(-3.12, 0, -4.0);
         state.scenarioStopped = true;
         state.brakeTimer = 99;
         state.scenarioLabel = "實境：停車標誌 · 停車線前全停";
@@ -1824,7 +1855,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     studsMid.instanceMatrix.needsUpdate = true;
     studsRight.instanceMatrix.needsUpdate = true;
 
-    // Scroll roadside props & gantry (keep gantry stationary overhead in tunnel_overhead mode!)
+    // Scroll roadside props & gantry (1:1 synced with ground roadSpeed — nothing hovers glued to the car!)
     for (const prop of roadsideProps) {
       let z = prop.position.z + state.roadSpeed * dt;
       if (z > 8) z -= PROP_SPAN;
@@ -1832,12 +1863,44 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       prop.position.z = z;
     }
 
-    if (state.scenario !== "tunnel_overhead") {
+    {
       let gz = gantry.position.z + state.roadSpeed * dt;
-      const gantryWrapFront = state.mode === "quiz" ? -1.4 : 7.5;
-      if (gz > gantryWrapFront) gz = -24;
-      else if (gz < -25) gz = gantryWrapFront - 0.5;
+      const gantryWrapFront = state.mode === "quiz" ? -2.0 : 7.5;
+      const gantryResetBack = state.scenario === "tunnel_overhead" ? -18.5 : -24;
+      if (gz > gantryWrapFront) gz = gantryResetBack;
+      else if (gz < gantryResetBack - 1) gz = gantryWrapFront - 0.5;
       gantry.position.z = gz;
+    }
+
+    // Ground-locked 1:1 scrolling for scenario roadside signs, intersections, roadworks & markings when moving!
+    if (Math.abs(state.roadSpeed) > 0.05) {
+      if (signPostGroup.visible) {
+        let sz = signPostGroup.position.z + state.roadSpeed * dt;
+        if (sz > 5.5) sz = -14.5;
+        else if (sz < -15.5) sz = 4.5;
+        signPostGroup.position.z = sz;
+      }
+      if (trafficGroup.visible) {
+        let tz = trafficGroup.position.z + state.roadSpeed * dt;
+        if (tz > 7.5) tz = -15.0;
+        else if (tz < -16.0) tz = 6.5;
+        trafficGroup.position.z = tz;
+        if (stopLineMesh.visible) stopLineMesh.position.z = -1.95 + tz;
+      }
+      if (roadworksGroup.visible) {
+        let rz = roadworksGroup.position.z + state.roadSpeed * dt;
+        if (rz > 9.5) rz = -14.0;
+        else if (rz < -15.0) rz = 8.5;
+        roadworksGroup.position.z = rz;
+      }
+      if (roundaboutGroup.visible) {
+        let rbz = roundaboutGroup.position.z + state.roadSpeed * dt;
+        if (rbz > 10.0) rbz = -12.0;
+        roundaboutGroup.position.z = rbz;
+      }
+    }
+    if (doubleWhiteGroup.visible && dwLeftBroken.visible) {
+      dwLeftBroken.position.z = ((state.roadOffset % 2.1) + 2.1) % 2.1;
     }
 
     // Animate scenario-specific dynamic props
