@@ -193,6 +193,11 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         ctx.moveTo(72, 24); ctx.lineTo(26, 70);
         ctx.moveTo(26, 44); ctx.lineTo(26, 70); ctx.lineTo(52, 70);
         ctx.stroke();
+      } else if (kind === "amber") {
+        ctx.fillStyle = "#f59e0b";
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, 24, 0, Math.PI * 2);
+        ctx.fill();
       } else {
         ctx.fillStyle = "#10b981";
         ctx.beginPath();
@@ -207,6 +212,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   const laneArrowTex = makeLaneSignalTex("down");
   const laneCrossTex = makeLaneSignalTex("cross");
   const laneMergeTex = makeLaneSignalTex("merge_left");
+  const laneAmberTex = makeLaneSignalTex("amber");
 
   const yellowBoxTex = makeCanvasTexture(256, 256, (ctx, w, h) => {
     ctx.fillStyle = "#353c48";
@@ -364,7 +370,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   const PROP_SPAN = 36;
   const roadsideProps = [];
   const poleGeo = new THREE.CylinderGeometry(0.045, 0.06, 2.7, 8);
-  const armGeo = new THREE.BoxGeometry(0.65, 0.05, 0.05);
+  const armGeo = new THREE.BoxGeometry(0.95, 0.05, 0.05);
   const bulbGeo = new THREE.BoxGeometry(0.24, 0.06, 0.12);
   const coneBaseGeo = new THREE.BoxGeometry(0.24, 0.04, 0.24);
   const coneBodyGeo = new THREE.ConeGeometry(0.1, 0.34, 12);
@@ -378,18 +384,19 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
     const lampL = new THREE.Group();
     const pL = new THREE.Mesh(poleGeo, poleMat); pL.position.y = 1.35; pL.castShadow = true;
-    const aL = new THREE.Mesh(armGeo, poleMat); aL.position.set(0.3, 2.66, 0);
-    const bL = new THREE.Mesh(bulbGeo, lampHeadMat); bL.position.set(0.55, 2.62, 0);
+    const aL = new THREE.Mesh(armGeo, poleMat); aL.position.set(0.45, 2.66, 0);
+    const bL = new THREE.Mesh(bulbGeo, lampHeadMat); bL.position.set(0.84, 2.62, 0);
     lampL.add(pL, aL, bL);
-    lampL.position.set(-roadWidth / 2 - 0.55, 0, 0);
+    // Placed slightly further out on verge so roadside signs & traffic lights ALWAYS stand cleanly in front!
+    lampL.position.set(-roadWidth / 2 - 1.05, 0, 0);
     pair.add(lampL);
 
     const lampR = new THREE.Group();
     const pR = new THREE.Mesh(poleGeo, poleMat); pR.position.y = 1.35; pR.castShadow = true;
-    const aR = new THREE.Mesh(armGeo, poleMat); aR.position.set(-0.3, 2.66, 0);
-    const bR = new THREE.Mesh(bulbGeo, lampHeadMat); bR.position.set(-0.55, 2.62, 0);
+    const aR = new THREE.Mesh(armGeo, poleMat); aR.position.set(-0.45, 2.66, 0);
+    const bR = new THREE.Mesh(bulbGeo, lampHeadMat); bR.position.set(-0.84, 2.62, 0);
     lampR.add(pR, aR, bR);
-    lampR.position.set(roadWidth / 2 + 0.55, 0, -2.5);
+    lampR.position.set(roadWidth / 2 + 1.05, 0, -2.5);
     pair.add(lampR);
 
     const tree = new THREE.Group();
@@ -571,35 +578,51 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   yellowBoxGroup.add(ybMesh);
 
   const railGroup = new THREE.Group();
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.35, metalness: 0.8 });
-  [-0.36, 0.36].forEach((rx) => {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.025, 16), railMat);
-    rail.position.set(rx, 0.016, -4.5);
+  const railMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.25, metalness: 0.85 });
+  [-0.42, 0.42].forEach((rx) => {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 16), railMat);
+    rail.position.set(rx, 0.018, -4.5);
     railGroup.add(rail);
   });
   yellowBoxGroup.add(railGroup);
   scenarioRoot.add(yellowBoxGroup);
 
-  // 5. 3D Double White Lines (solid-solid OR broken on left side)
+  // 5. 3D Double White Lines (crisp spacing & contrast so solid vs broken side is unmistakable!)
   const doubleWhiteGroup = new THREE.Group();
   doubleWhiteGroup.visible = false;
-  const dwRightSolid = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 26), edgeLineMat);
+  const dwLineMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x334155, emissiveIntensity: 0.25, roughness: 0.4 });
+  const dwRightSolid = new THREE.Mesh(new THREE.PlaneGeometry(0.11, 26), dwLineMat);
   dwRightSolid.rotation.x = -Math.PI / 2;
-  dwRightSolid.position.set(0.1, 0.013, -6);
-  const dwLeftSolid = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 26), edgeLineMat);
+  dwRightSolid.position.set(0.14, 0.014, -6);
+  const dwLeftSolid = new THREE.Mesh(new THREE.PlaneGeometry(0.11, 26), dwLineMat);
   dwLeftSolid.rotation.x = -Math.PI / 2;
-  dwLeftSolid.position.set(-0.1, 0.013, -6);
+  dwLeftSolid.position.set(-0.14, 0.014, -6);
   const dwLeftBroken = new THREE.Group();
   for (let i = 0; i < 12; i++) {
-    const seg = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 1.0), edgeLineMat);
+    const seg = new THREE.Mesh(new THREE.PlaneGeometry(0.11, 1.05), dwLineMat);
     seg.rotation.x = -Math.PI / 2;
-    seg.position.set(-0.1, 0.013, 4 - i * 2.1);
+    seg.position.set(-0.14, 0.014, 4 - i * 2.1);
     dwLeftBroken.add(seg);
   }
   doubleWhiteGroup.add(dwRightSolid, dwLeftSolid, dwLeftBroken);
   scenarioRoot.add(doubleWhiteGroup);
 
-  // 6. 3D Roadworks Truck + Flashing Amber Matrix Board + Safety Cones
+  // Helper: grounded wheels & rear tail lights for NPC vehicles (zero floating boxes!)
+  const npcWheelGeo = new THREE.CylinderGeometry(0.21, 0.21, 0.16, 14);
+  npcWheelGeo.rotateZ(Math.PI / 2);
+  const npcTireMat = new THREE.MeshStandardMaterial({ color: 0x181c22, roughness: 0.9 });
+  const npcTailMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, emissive: 0xef4444, emissiveIntensity: 1.1 });
+  function addNpcWheels(group, halfX, zPositions) {
+    for (const wz of zPositions) {
+      for (const wx of [-halfX, halfX]) {
+        const w = new THREE.Mesh(npcWheelGeo, npcTireMat);
+        w.position.set(wx, 0.21, wz);
+        group.add(w);
+      }
+    }
+  }
+
+  // 6. 3D Roadworks Truck + Flashing Amber Matrix Board + Properly Tapered Safety Cones
   const roadworksGroup = new THREE.Group();
   roadworksGroup.visible = false;
   const rwTruck = new THREE.Group();
@@ -612,6 +635,12 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   const rwBoardBack = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.72, 0.1), darkMetalMat);
   rwBoardBack.position.set(0, 1.52, 0.92);
   rwTruck.add(rwCab, rwBoardBack);
+  addNpcWheels(rwTruck, 0.56, [-0.58, 0.58]);
+  [-0.38, 0.38].forEach((tx) => {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.09, 0.05), npcTailMat);
+    tl.position.set(tx, 0.42, 0.96);
+    rwTruck.add(tl);
+  });
 
   const rwLampGeo = new THREE.SphereGeometry(0.075, 10, 8);
   const rwLampMatA = new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xf59e0b, emissiveIntensity: 2.0 });
@@ -621,21 +650,22 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   const rwTR = new THREE.Mesh(rwLampGeo, rwLampMatB); rwTR.position.set(0.36, 1.72, 0.99);
   const rwBL = new THREE.Mesh(rwLampGeo, rwLampMatB); rwBL.position.set(-0.36, 1.32, 0.99);
   rwTruck.add(rwTL, rwBR, rwTR, rwBL);
-  rwTruck.position.set(1.05, 0, -4.6);
+  rwTruck.position.set(1.05, 0, -5.2);
   roadworksGroup.add(rwTruck);
 
+  // Correct HK safety taper: starts near right curb closer to traffic and tapers INWARD toward center to guide cars LEFT!
   for (let i = 0; i < 4; i++) {
     const c = new THREE.Group();
     const cb = new THREE.Mesh(coneBaseGeo, coneOrangeMat); cb.position.y = 0.02;
     const co = new THREE.Mesh(coneBodyGeo, coneOrangeMat); co.position.y = 0.2; co.castShadow = true;
     const cs = new THREE.Mesh(coneBandGeo, coneStripeMat); cs.position.y = 0.22;
     c.add(cb, co, cs);
-    c.position.set(0.28 + i * 0.25, 0, -2.2 - i * 0.65);
+    c.position.set(1.72 - i * 0.46, 0, -2.1 - i * 0.68);
     roadworksGroup.add(c);
   }
   scenarioRoot.add(roadworksGroup);
 
-  // 7. 3D HK Ambulance (Flashing Red/Blue Lightbar!) + Breakdown Warning Triangle
+  // 7. 3D HK Ambulance (Flashing Red/Blue Lightbar, overtaking FORWARD in right lane!) + 3D Warning Triangle
   const emergencyGroup = new THREE.Group();
   emergencyGroup.visible = false;
   const ambGroup = new THREE.Group();
@@ -657,11 +687,32 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   const ambLightR = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.14, 0.18), ambBlueMat);
   ambLightR.position.set(0.22, 1.24, -0.45);
   ambGroup.add(ambBody, ambStripe, ambLightL, ambLightR);
-  ambGroup.position.set(1.05, 0, -5.5);
+  addNpcWheels(ambGroup, 0.54, [-0.72, 0.72]);
+  [-0.36, 0.36].forEach((tx) => {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.05), npcTailMat);
+    tl.position.set(tx, 0.44, 1.19);
+    ambGroup.add(tl);
+  });
+  ambGroup.position.set(1.05, 0, -1.5);
   emergencyGroup.add(ambGroup);
   scenarioRoot.add(emergencyGroup);
 
-  // 8. 3D HK Double-Decker Bus (for Bus Lane & Heavy Vehicle questions!)
+  // 3D Red Reflective Breakdown Warning Triangle (placed behind car ONLY on <=50 km/h roads!)
+  const warningTriangleGroup = new THREE.Group();
+  warningTriangleGroup.visible = false;
+  const triOuter = new THREE.Mesh(
+    new THREE.ConeGeometry(0.28, 0.44, 3),
+    new THREE.MeshStandardMaterial({ color: 0xdc2626, emissive: 0xef4444, emissiveIntensity: 0.65, roughness: 0.3 })
+  );
+  triOuter.scale.set(1, 1, 0.14);
+  triOuter.position.set(0, 0.24, 0);
+  const triBase = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.04, 0.18), darkMetalMat);
+  triBase.position.set(0, 0.02, 0);
+  warningTriangleGroup.add(triOuter, triBase);
+  warningTriangleGroup.position.set(-1.55, 0, 2.55);
+  scenarioRoot.add(warningTriangleGroup);
+
+  // 8. 3D HK Double-Decker Bus (grounded with wheels + rear tail lights!)
   const busGroup = new THREE.Group();
   busGroup.visible = false;
   const busBody = new THREE.Mesh(
@@ -681,10 +732,16 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   );
   busGlass.position.y = 1.48;
   busGroup.add(busBody, busBand, busGlass);
+  addNpcWheels(busGroup, 0.58, [-1.15, 0.95]);
+  [-0.4, 0.4].forEach((tx) => {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.11, 0.05), npcTailMat);
+    tl.position.set(tx, 0.46, 1.82);
+    busGroup.add(tl);
+  });
   busGroup.position.set(-1.05, 0, -5.8);
   scenarioRoot.add(busGroup);
 
-  // 9. 3D NPC Lead Vehicle (for Overtaking / Following Distance / 2-Second Rule!)
+  // 9. 3D NPC Lead Vehicle (grounded with wheels + tail lights!)
   const npcCarGroup = new THREE.Group();
   npcCarGroup.visible = false;
   const npcBody = new THREE.Mesh(
@@ -698,42 +755,59 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.15 })
   );
   npcCabin.position.set(0, 0.7, 0.06);
-  const npcTailMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, emissive: 0xef4444, emissiveIntensity: 1.1 });
   [-0.34, 0.34].forEach((tx) => {
     const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.09, 0.05), npcTailMat);
     tl.position.set(tx, 0.42, 1.04);
     npcCarGroup.add(tl);
   });
   npcCarGroup.add(npcBody, npcCabin);
+  addNpcWheels(npcCarGroup, 0.5, [-0.64, 0.64]);
   npcCarGroup.position.set(-1.05, 0, -4.6);
   scenarioRoot.add(npcCarGroup);
 
-  // 10. 3D Roundabout Central Island (positioned clearly ahead of yield line!)
+  // 10. 3D Hong Kong 2-Lane Roundabout (full circular asphalt apron + dashed lane ring + central island!)
   const roundaboutGroup = new THREE.Group();
   roundaboutGroup.visible = false;
+  const rbApron = new THREE.Mesh(new THREE.CylinderGeometry(4.35, 4.35, 0.02, 36), roadMat);
+  rbApron.position.set(0, 0.008, -6.2);
+  rbApron.receiveShadow = true;
+  const rbOuterCurb = new THREE.Mesh(new THREE.TorusGeometry(4.42, 0.1, 10, 40), curbMat);
+  rbOuterCurb.rotation.x = Math.PI / 2;
+  rbOuterCurb.position.set(0, 0.06, -6.2);
+  const rbLaneRing = new THREE.Mesh(new THREE.RingGeometry(2.85, 2.95, 40), edgeLineMat);
+  rbLaneRing.rotation.x = -Math.PI / 2;
+  rbLaneRing.position.set(0, 0.022, -6.2);
   const rbIsland = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.5, 1.6, 0.24, 28),
+    new THREE.CylinderGeometry(1.45, 1.55, 0.24, 28),
     new THREE.MeshStandardMaterial({ color: 0x2d7d57, roughness: 0.9 })
   );
-  rbIsland.position.set(0, 0.12, -6.2);
+  rbIsland.position.set(0, 0.13, -6.2);
   rbIsland.receiveShadow = true;
-  const rbCurb = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.08, 10, 32), curbMat);
+  const rbCurb = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.08, 10, 32), curbMat);
   rbCurb.rotation.x = Math.PI / 2;
-  rbCurb.position.set(0, 0.08, -6.2);
-  roundaboutGroup.add(rbIsland, rbCurb);
+  rbCurb.position.set(0, 0.09, -6.2);
+  roundaboutGroup.add(rbApron, rbOuterCurb, rbLaneRing, rbIsland, rbCurb);
   scenarioRoot.add(roundaboutGroup);
 
-  // 11. 3D Tunnel Arch Portal (for Tunnel & Overhead Lane Signal questions!)
+  // 11. 3D Hong Kong Tunnel Portal & Interior Lights (wide clearance, zero streetlamp/gantry clipping!)
   const tunnelGroup = new THREE.Group();
   tunnelGroup.visible = false;
   const tunnelWallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85 });
-  const tunRoof = new THREE.Mesh(new THREE.BoxGeometry(roadWidth + 1.4, 0.35, 14), tunnelWallMat);
-  tunRoof.position.set(0, 3.05, -8.5);
-  const tunWallL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.1, 14), tunnelWallMat);
-  tunWallL.position.set(-roadWidth / 2 - 0.55, 1.55, -8.5);
-  const tunWallR = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.1, 14), tunnelWallMat);
-  tunWallR.position.set(roadWidth / 2 + 0.55, 1.55, -8.5);
+  const tunnelLightMat = new THREE.MeshStandardMaterial({
+    color: 0xfff7d6, emissive: 0xfde68a, emissiveIntensity: 1.8, roughness: 0.2
+  });
+  const tunRoof = new THREE.Mesh(new THREE.BoxGeometry(roadWidth + 2.4, 0.36, 28), tunnelWallMat);
+  tunRoof.position.set(0, 3.45, -14.5);
+  const tunWallL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.5, 28), tunnelWallMat);
+  tunWallL.position.set(-roadWidth / 2 - 1.0, 1.75, -14.5);
+  const tunWallR = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.5, 28), tunnelWallMat);
+  tunWallR.position.set(roadWidth / 2 + 1.0, 1.75, -14.5);
   tunnelGroup.add(tunRoof, tunWallL, tunWallR);
+  for (let i = 0; i < 6; i++) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.3), tunnelLightMat);
+    strip.position.set(0, 3.24, -2.5 - i * 4.2);
+    tunnelGroup.add(strip);
+  }
   scenarioRoot.add(tunnelGroup);
 
   // 12. 3D Rain Streaks (InstancedMesh — active only in Rain / Wet / Typhoon questions!)
@@ -963,6 +1037,11 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     scenarioSlope: 0, // radians tilt for slope_hill
     scenarioParkedWheel: null, // null | "right" | "left" (for slope parking demonstration)
     scenarioStopped: false,
+    scenarioSlow: false,
+    scenarioCanOvertake: false,
+    scenarioAmberGantry: false,
+    scenarioBrakeDemo: false,
+    scenarioPedSlow: false,
     scenarioOutcome: null, // null | "right" | "wrong"
     gear: "D",
     lane: "left",
@@ -996,8 +1075,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     spFaceMat.needsUpdate = true;
     const img = tex?.image;
     if (img && img.width && img.height) {
-      const ar = THREE.MathUtils.clamp(img.width / img.height, 0.62, 1.65);
-      const maxDim = 0.88;
+      const ar = THREE.MathUtils.clamp(img.width / img.height, 0.58, 2.2);
+      const maxDim = 0.92;
       const bw = ar >= 1 ? maxDim : maxDim * ar;
       const bh = ar >= 1 ? maxDim / ar : maxDim;
       spBoard.scale.set(bw, bh, 1);
@@ -1044,30 +1123,45 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     latestSignReqKey = null;
     trafficGroup.visible = false;
     trafficGroup.position.set(0, 0, 0);
+    tlHead.visible = true;
+    tlRed.visible = tlAmber.visible = tlGreen.visible = true;
+    tlRedMat.emissiveIntensity = 0.05;
+    tlAmberMat.emissiveIntensity = 0.05;
+    tlGreenMat.emissiveIntensity = 0.05;
     stopLineMesh.visible = false;
     stopLineMesh.position.set(0, 0.012, -1.95);
     tlArrowBox.visible = false;
     wigwagBox.visible = false;
     signPostGroup.visible = false;
-    signPostGroup.position.set(-2.95, 0, -7.2);
-    signPostGroup.rotation.y = 0.12;
+    signPostGroup.position.set(-3.12, 0, -6.8);
+    signPostGroup.rotation.y = 0.14;
     zebraGroup.visible = false;
     yellowBoxGroup.visible = false;
     doubleWhiteGroup.visible = false;
     dwLeftBroken.position.z = 0;
     roadworksGroup.visible = false;
-    roadworksGroup.position.set(0, 0, -4.2);
+    roadworksGroup.position.set(0, 0, -2.0);
     emergencyGroup.visible = false;
+    ambGroup.position.set(1.05, 0, 1.8);
+    warningTriangleGroup.visible = false;
     busGroup.visible = false;
     npcCarGroup.visible = false;
+    npcCarGroup.position.set(-1.05, 0, -4.6);
     roundaboutGroup.visible = false;
     roundaboutGroup.position.set(0, 0, 0);
     tunnelGroup.visible = false;
     rainInst.visible = false;
+    curbYellow1.visible = true;
     curbYellow2.visible = false;
     leftCurb.visible = true;
+    rightCurb.visible = true;
     dashInst.visible = true;
+    studsLeft.visible = true;
+    studsMid.visible = true;
+    studsRight.visible = true;
     gantry.visible = true;
+    gBoard.visible = true;
+    for (const prop of roadsideProps) prop.visible = true;
     spPoleMat.color.setHex(0x94a3b8);
 
     // Reset gantry lane signals to green down arrow
@@ -1083,6 +1177,11 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     state.scenarioSlope = 0;
     state.scenarioParkedWheel = null;
     state.scenarioStopped = false;
+    state.scenarioSlow = false;
+    state.scenarioCanOvertake = false;
+    state.scenarioAmberGantry = false;
+    state.scenarioBrakeDemo = false;
+    state.scenarioPedSlow = false;
     state.scenarioOutcome = null;
     state.targetCarYaw = 0;
     state.targetZ = 0.25;
@@ -1092,28 +1191,80 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     state.brakeTimer = 0;
   }
 
+  // Non-roadside illustrations (vehicle plates, road-surface markings, signal diagrams, multi-pole charts)
+  const NON_ROADSIDE_SIGNS = new Set([
+    "p_plate",
+    "long_vehicle_plate",
+    "pole_colors",
+    "zebra_crossing_mark",
+    "yellow_box_normal",
+    "tram_stop_mark",
+    "school_patrol"
+  ]);
+
+  function isRoadsideSignAsset(s) {
+    if (!s || NON_ROADSIDE_SIGNS.has(s)) return false;
+    return !(
+      s.startsWith("signal_") ||
+      s.startsWith("hand_") ||
+      s.startsWith("road_") ||
+      s.startsWith("slope_") ||
+      s.startsWith("stopping_") ||
+      s.startsWith("roundabout") ||
+      s.startsWith("roadworks") ||
+      s.startsWith("lane_signal")
+    );
+  }
+
+  // Precision classifier grounded strictly in q.sign + q.prompt (never polluted by broad chapter section titles!)
   function classifyQuestionScenario(q) {
     const s = q.sign || "";
-    const p = `${q.prompt || ""} ${q.source?.section || ""} ${q.category || ""}`;
-    if (s === "signal_red_amber" || /紅燈與黃燈|紅黃燈|紅燈仍然亮着/.test(p)) return "traffic_red_amber";
-    if (s === "signal_red_green_arrow" || /綠色箭嘴|綠箭嘴/.test(p)) return "traffic_green_arrow";
-    if (s === "signal_wigwag" || /交替閃動.*紅燈|紅色警告閃燈|消防局/.test(p)) return "traffic_wigwag";
-    if (/交通燈|綠燈|黃燈|紅燈|燈號/.test(p) && !/架空|工程車|危險警告燈|霧燈|車頭大燈|手號/.test(p)) return "traffic_light_general";
-    if (s.startsWith("lane_signal") || /架空|行車線信號|隧道/.test(p)) return "tunnel_overhead";
-    if (s.startsWith("roadworks") || /工程|雪糕筒|閃爍箭嘴/.test(p)) return "roadworks";
-    if (s.startsWith("slope_park") || s === "warn_steep_down" || /斜路|斜坡|上坡|下坡/.test(p)) return "slope_hill";
-    if (s.startsWith("roundabout") || /迴旋處/.test(p)) return "roundabout";
-    if (s.includes("yellow_box") || /黃色方格|黃格|電車|輕鐵/.test(p)) return "yellow_box_rail";
-    if (s.includes("double_white") || /雙白線|警告線|白色.*線|行車線界線|反光路釘/.test(p)) return "road_markings_white";
-    if (s.includes("yellow_lines") || s === "no_stopping" || s === "no_parking" || /不准停車|不准泊車|黃線|紅杆|綠杆|泊車|停泊/.test(p)) return "parking_curb";
-    if (s.includes("bus_lane") || s === "contraflow_bus" || /巴士線|巴士/.test(p)) return "bus_lane";
-    if (/斑馬線|行人|學童|學校|長者|視障|過路處|綠公仔/.test(p)) return "pedestrian_zebra";
-    if (/緊急|救護車|消防車|警車|壞車|意外|急救|起火|路肩/.test(p)) return "emergency_hazard";
-    if (/霧|雨|夜間|晚上|大燈|高燈|低燈|濕滑|強風|颱風|能見度/.test(p)) return "weather_night_rain";
-    if (/超車|爬頭|扒頭|盲點|讓路|切線|跟車|停車距離|兩秒|車速|限速|快速公路|切入/.test(p)) return "highway_overtake";
-    if (s.startsWith("hand_signal") || /手號|響號|閃動大燈|倒車|掉頭|轉右|轉左/.test(p)) return "maneuver_signal";
+    const p = q.prompt || "";
+
+    // 1. Exact official sign-key routing first (100% deterministic, zero keyword collisions!)
+    if (s === "signal_red_amber") return "traffic_red_amber";
+    if (s === "signal_red_green_arrow") return "traffic_green_arrow";
+    if (s === "signal_wigwag") return "traffic_wigwag";
+    if (s.startsWith("lane_signal") || s === "tunnel_start" || s === "no_dangerous_goods" || s === "no_lane_change") return "tunnel_overhead";
+    if (s.startsWith("roadworks") || s === "warn_roadworks") return "roadworks";
+    if (s.startsWith("slope_park") || s === "warn_steep_down") return "slope_hill";
+    if (s.startsWith("roundabout") || s === "warn_roundabout") return "roundabout";
+    if (s.includes("yellow_box") || s === "lrt_tram_only" || s === "warn_lrt_tram" || s === "tram_stop_mark") return "yellow_box_rail";
+    if (s === "zebra_crossing_mark" || s === "warn_zebra_ahead" || s === "warn_children" || s === "warn_disabled" || s === "pedestrian_priority" || s === "school_patrol") return "pedestrian_zebra";
+    if (s.includes("double_white") || s === "road_white_lines") return "road_markings_white";
+    if (s.includes("yellow_lines") || s === "no_stopping" || s === "no_parking" || s === "parking_general" || s === "pole_colors") return "parking_curb";
+    if (s.includes("bus_lane") || s === "contraflow_bus") return "bus_lane";
+    if (s === "stopping_buses" || s === "stopping_distance_chart" || s === "no_overtaking") return "highway_overtake";
+    if (s === "wind_affected") return "weather_night_rain";
+    if (s.startsWith("hand_signal")) return "maneuver_signal";
+    if (s === "p_plate") return "cockpit_safety";
+    if (s === "long_vehicle_plate") return "highway_overtake";
     if (s) return "roadside_sign_3d";
-    if (/酒精|酒駕|藥駕|安全帶|手提電話|流動電訊|P 牌|暫准|記分|車牌|輪胎|胎紋|自動波|兒童|安全椅|輔助駕駛|停車熄匙/.test(p)) return "cockpit_safety";
+
+    // 2. Text-question routing strictly on prompt text
+    if (/紅燈與黃燈|紅黃燈|紅燈仍然亮着/.test(p)) return "traffic_red_amber";
+    if (/綠色箭嘴|右轉箭嘴|綠箭嘴/.test(p)) return "traffic_green_arrow";
+    if (/交替閃動.*紅燈|紅色警告閃燈|消防局門外/.test(p)) return "traffic_wigwag";
+    if (/行人隧道|斑馬線|綠色人像|過馬路守則|視障|反光物料|行人優先使用區|沒有行人路|對行人須加倍留意/.test(p) && !/全部失靈|完全失靈/.test(p)) {
+      return "pedestrian_zebra";
+    }
+    if (/警務人員.*指揮|警務人員.*截停/.test(p)) return "maneuver_signal";
+    if (/交通燈|單一黃燈|右轉袋口位|輔助交通燈|臨時交通燈/.test(p) && !/不設交通燈/.test(p)) return "traffic_light_general";
+    if (/架空行車線信號|架空方向指示|隧道/.test(p) && !/行人隧道/.test(p)) return "tunnel_overhead";
+    if (/道路工程|工程車|閃爍箭嘴/.test(p)) return "roadworks";
+    if (/斜路|斜坡|上坡|下坡/.test(p)) return "slope_hill";
+    if (/迴旋處/.test(p)) return "roundabout";
+    if (/黃色方格|黃色交叉方格|黃格|電車|輕鐵/.test(p)) return "yellow_box_rail";
+    if (/巴士線/.test(p)) return "bus_lane";
+    if (/雙白線|警告線|白色斜線|人字形|反光路釘/.test(p)) return "road_markings_white";
+    if (/大霧.*泊車/.test(p)) return "weather_night_rain";
+    if (/不准停車|不准泊車|禁止泊車|限制區|紅杆|綠杆|黃色斜線|公眾泊車|指定泊車處|燈距不超過/.test(p)) return "parking_curb";
+    if (/公共巴士|雙層巴士|巴士.*最高車速|巴士.*超車/.test(p)) return "bus_lane";
+    if (/救護車|緊急服務車輛|壞車|危險警告燈|死火燈|路肩|交通意外|急救|999|里程標誌|傷者|傷亡/.test(p)) return "emergency_hazard";
+    if (/閃動大燈|倒車|手號|方向指示燈|轉左|轉右|剎車燈|停車燈/.test(p) && !/的士/.test(p)) return "maneuver_signal";
+    if (/大霧|薄霧|雨|濕滑|滑溜|水浸|強風|熱帶氣旋|夜間|高燈|低燈|車頭大燈|能見度/.test(p)) return "weather_night_rain";
+    if (/超車|超越停泊|跟車|停車距離|兩秒|車速限制|最高車速|快速公路|三條行車線|加速行車線|切入|窄路.*迎面|讓路|行車線箭嘴|的士或公共小型巴士/.test(p)) return "highway_overtake";
+    if (/停車熄匙|自動波|泊車波|P 波|安全帶|酒精|藥駕|毒駕|記分|暫准駕駛|流動電訊|胎紋|輔助駕駛|兒童束縛|氣袋|嬰兒|視力標準/.test(p)) return "cockpit_safety";
     return "city_cruising";
   }
 
@@ -1129,10 +1280,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     const p = q.prompt || "";
     const s = q.sign || "";
 
-    // If this question has an official PDF road sign (and isn't a traffic signal/chart diagram), mount it on our 3D signpost too!
-    const isDiagramNotRoadsideSign =
-      s.startsWith("signal_") || s.startsWith("hand_") || s.startsWith("road_") || s.startsWith("slope_") || s.startsWith("stopping_") || s.startsWith("roundabout") || s.startsWith("roadworks") || s.startsWith("lane_signal");
-    if (s && !isDiagramNotRoadsideSign) {
+    if (isRoadsideSignAsset(s)) {
       loadSignOn3DPost(s);
     }
 
@@ -1144,23 +1292,45 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         tlAmberMat.emissiveIntensity = 2.5;
         tlGreenMat.emissiveIntensity = 0.04;
         state.scenarioStopped = true;
-        state.gear = "D";
         state.brakeTimer = 99;
         state.scenarioLabel = "實境：紅黃燈齊亮路口";
         break;
 
-      case "traffic_green_arrow":
+      case "traffic_green_arrow": {
         trafficGroup.visible = true;
         stopLineMesh.visible = true;
-        tlArrowBox.visible = true;
-        tlRedMat.emissiveIntensity = 2.6;
-        tlAmberMat.emissiveIntensity = 0.04;
-        tlGreenMat.emissiveIntensity = 0.04;
-        state.scenarioStopped = true;
-        state.blinkerDir = -1;
-        state.blinkerTimer = 10;
-        state.scenarioLabel = "實境：紅燈＋左轉綠箭嘴";
+        const isNotTurningArrow = /並不打算/.test(p);
+        const isRightPocketGreen = /右轉袋口位|右轉箭嘴熄滅/.test(p);
+        if (isRightPocketGreen) {
+          tlRedMat.emissiveIntensity = 0.04;
+          tlAmberMat.emissiveIntensity = 0.04;
+          tlGreenMat.emissiveIntensity = 2.4;
+          state.lane = "right";
+          state.targetX = RIGHT_LANE_X;
+          state.blinkerDir = 1;
+          state.blinkerTimer = 10;
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：全綠燈右轉袋口位";
+        } else {
+          tlArrowBox.visible = true;
+          tlRedMat.emissiveIntensity = 2.6;
+          tlAmberMat.emissiveIntensity = 0.04;
+          tlGreenMat.emissiveIntensity = 0.04;
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          if (isNotTurningArrow) {
+            state.lane = "right";
+            state.targetX = RIGHT_LANE_X;
+            state.scenarioLabel = "實境：綠箭嘴路口直行線";
+          } else {
+            state.blinkerDir = -1;
+            state.blinkerTimer = 10;
+            state.scenarioLabel = "實境：紅燈＋左轉綠箭嘴";
+          }
+        }
         break;
+      }
 
       case "traffic_wigwag":
         trafficGroup.visible = true;
@@ -1176,25 +1346,60 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       case "traffic_light_general": {
         trafficGroup.visible = true;
         stopLineMesh.visible = true;
-        tlHead.visible = true;
-        tlRed.visible = tlAmber.visible = tlGreen.visible = true;
-        const isAmber = /黃燈|黃色燈/.test(p);
-        const isGreen = /綠燈|綠色燈/.test(p) && !/紅燈/.test(p);
-        tlRedMat.emissiveIntensity = !isAmber && !isGreen ? 2.6 : 0.04;
-        tlAmberMat.emissiveIntensity = isAmber ? 2.5 : 0.04;
-        tlGreenMat.emissiveIntensity = isGreen ? 2.4 : 0.04;
-        state.scenarioStopped = !isGreen;
-        if (!isGreen) state.brakeTimer = 99;
-        state.scenarioLabel = isGreen ? "實境：綠燈通行路口" : isAmber ? "實境：黃燈減速路口" : "實境：紅燈停車線前";
+        const isFailed = /全部失靈|完全失靈/.test(p);
+        const isAmber = !isFailed && /單一黃燈|黃燈/.test(p);
+        const isGreen = !isFailed && !isAmber && /綠燈|右轉袋口位/.test(p);
+        const isRoadworksTemp = /工程/.test(p);
+        if (isRoadworksTemp) roadworksGroup.visible = true;
+
+        if (isFailed) {
+          // ALL 3 lenses dark/off!
+          tlRedMat.emissiveIntensity = 0.01;
+          tlAmberMat.emissiveIntensity = 0.01;
+          tlGreenMat.emissiveIntensity = 0.01;
+          state.scenarioStopped = false;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：交通燈失靈路口";
+        } else {
+          tlRedMat.emissiveIntensity = !isAmber && !isGreen ? 2.6 : 0.04;
+          tlAmberMat.emissiveIntensity = isAmber ? 2.5 : 0.04;
+          tlGreenMat.emissiveIntensity = isGreen ? 2.4 : 0.04;
+          state.scenarioStopped = !isGreen;
+          if (!isGreen) state.brakeTimer = 99;
+          if (/右轉袋口位/.test(p)) {
+            state.lane = "right";
+            state.targetX = RIGHT_LANE_X;
+            state.blinkerDir = 1;
+            state.blinkerTimer = 8;
+          }
+          state.scenarioLabel = isRoadworksTemp
+            ? "實境：工程臨時交通燈"
+            : isGreen
+              ? "實境：綠燈通行路口"
+              : isAmber
+                ? "實境：單一黃燈路口"
+                : "實境：紅燈停車線前";
+        }
         break;
       }
 
       case "tunnel_overhead": {
         tunnelGroup.visible = true;
-        gantry.position.z = -4.2;
-        const isCross = s === "lane_signal_cross" || /紅色交叉|紅燈/.test(p);
-        const isMerge = s === "lane_signal_merge_left" || /斜箭嘴/.test(p);
-        if (isCross) {
+        gBoard.visible = false;
+        for (const prop of roadsideProps) prop.visible = false;
+        gantry.position.z = -5.6;
+        const isBreakdown = /壞車|起火/.test(p);
+        const isCross = s === "lane_signal_cross" || /紅色交叉/.test(p);
+        const isMerge = s === "lane_signal_merge_left" || /左下斜箭嘴|斜箭嘴/.test(p);
+        const isAmberFlash = /黃燈閃動/.test(p);
+
+        if (isBreakdown) {
+          state.scenarioStopped = true;
+          state.gear = "P";
+          state.hazardTimer = 16;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：隧道內壞車亮死火燈";
+        } else if (isCross) {
           laneSignalLeftMat.map = laneCrossTex;
           laneSignalLeftMat.emissiveMap = laneCrossTex;
           laneSignalLeftMat.emissive.setHex(0xef4444);
@@ -1206,6 +1411,16 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
           state.lane = "right";
           state.targetX = RIGHT_LANE_X;
           state.scenarioLabel = "實境：架空綠斜箭切線";
+        } else if (isAmberFlash) {
+          laneSignalLeftMat.map = laneAmberTex;
+          laneSignalLeftMat.emissiveMap = laneAmberTex;
+          laneSignalLeftMat.emissive.setHex(0xf59e0b);
+          laneSignalRightMat.map = laneAmberTex;
+          laneSignalRightMat.emissiveMap = laneAmberTex;
+          laneSignalRightMat.emissive.setHex(0xf59e0b);
+          state.scenarioAmberGantry = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：架空黃燈閃動警告";
         } else {
           state.scenarioLabel = "實境：香港隧道行車";
         }
@@ -1215,13 +1430,15 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
       case "roadworks":
         roadworksGroup.visible = true;
-        state.scenarioLabel = "實境：工程車對角閃燈";
+        roadworksGroup.position.set(0, 0, -2.0);
+        state.scenarioSlow = true;
+        state.scenarioLabel = /工程車/.test(p) ? "實境：工程車閃燈警告" : "實境：前方道路工程改道";
         break;
 
       case "slope_hill": {
-        const isDown = /下坡|向下斜|1:8/.test(p);
         const noKerb = s === "slope_park_no_kerb" || /沒有路邊石/.test(p);
-        state.scenarioSlope = isDown ? -0.14 : 0.14;
+        const isDown = !noKerb && /下坡|向下斜|1:8|1:5/.test(p);
+        state.scenarioSlope = isDown ? -0.15 : 0.15;
         leftCurb.visible = !noKerb;
         if (/泊車|斜路泊/.test(p)) {
           state.scenarioStopped = true;
@@ -1229,7 +1446,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
           state.gear = "P";
           state.scenarioLabel = noKerb ? "實境：無石壆斜路泊車" : isDown ? "實境：下斜靠壆泊車" : "實境：上斜靠壆泊車";
         } else {
-          state.scenarioLabel = isDown ? "實境：1:8 落斜低波行車" : "實境：斜坡行車";
+          state.scenarioSlow = true;
+          state.scenarioLabel = isDown ? "實境：陡斜落斜低波行車" : "實境：斜坡行車";
         }
         break;
       }
@@ -1237,7 +1455,11 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       case "roundabout":
         roundaboutGroup.visible = true;
         gantry.visible = false;
-        // Calmly yield at roundabout entry before answering (no lane spoiler, zero floating island!)
+        dashInst.visible = false;
+        studsLeft.visible = studsMid.visible = studsRight.visible = false;
+        curbYellow1.visible = false;
+        leftCurb.visible = rightCurb.visible = false;
+        for (const prop of roadsideProps) prop.visible = false;
         state.scenarioStopped = true;
         state.brakeTimer = 99;
         state.targetX = 0;
@@ -1246,7 +1468,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
       case "yellow_box_rail":
         yellowBoxGroup.visible = true;
-        railGroup.visible = /電車|輕鐵|路軌/.test(p);
+        dashInst.visible = false;
+        studsMid.visible = false;
+        railGroup.visible = /電車|輕鐵|路軌/.test(p) || s === "lrt_tram_only" || s === "warn_lrt_tram" || s === "tram_stop_mark";
         state.scenarioStopped = true;
         state.brakeTimer = 99;
         state.scenarioLabel = railGroup.visible ? "實境：電車／輕鐵黃格路口" : "實境：黃色方格路口";
@@ -1256,12 +1480,16 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         if (/雙白線/.test(p) || s.includes("double_white")) {
           doubleWhiteGroup.visible = true;
           dashInst.visible = false;
+          studsMid.visible = false;
           const brokenOnYourSide = s === "road_double_white_broken" || /虛線/.test(p);
           dwLeftSolid.visible = !brokenOnYourSide;
           dwLeftBroken.visible = brokenOnYourSide;
           state.scenarioLabel = brokenOnYourSide ? "實境：靠你一邊虛雙白線" : "實境：連續雙白實線";
+        } else if (/反光路釘/.test(p)) {
+          state.scenarioWeather = "night";
+          state.scenarioLabel = "實境：紅白琥珀反光路釘";
         } else {
-          state.scenarioLabel = "實境：道路白線與反光路釘";
+          state.scenarioLabel = "實境：白色警告線與道路標記";
         }
         break;
 
@@ -1270,44 +1498,77 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         if (/紅杆/.test(p)) spPoleMat.color.setHex(0xdc2626);
         else if (/綠杆/.test(p)) spPoleMat.color.setHex(0x059669);
         else if (/黃杆/.test(p)) spPoleMat.color.setHex(0xeab308);
-        state.targetX = -1.38;
-        state.scenarioLabel = "實境：路旁禁區黃線與標誌";
+        state.targetX = LEFT_LANE_X;
+        state.scenarioLabel = "實境：路旁禁區黃線與泊車規則";
         break;
 
       case "bus_lane":
         busGroup.visible = true;
         state.lane = "right";
         state.targetX = RIGHT_LANE_X;
-        state.scenarioLabel = "實境：香港巴士專線旁行車";
+        state.scenarioLabel = /車速/.test(p) ? "實境：大型巴士與貨車限速" : "實境：香港巴士專線旁行車";
         break;
 
-      case "pedestrian_zebra":
+      case "pedestrian_zebra": {
         zebraGroup.visible = true;
+        const isGreenWithElderly = /綠燈剛亮起|長者/.test(p);
+        if (isGreenWithElderly) {
+          trafficGroup.visible = true;
+          stopLineMesh.visible = true;
+          tlRedMat.emissiveIntensity = 0.04;
+          tlAmberMat.emissiveIntensity = 0.04;
+          tlGreenMat.emissiveIntensity = 2.4;
+          state.scenarioPedSlow = true;
+          state.scenarioLabel = "實境：綠燈仍須讓行人先過";
+        } else if (/反光物料|漆黑/.test(p)) {
+          state.scenarioWeather = "night";
+          state.scenarioLabel = "實境：夜間行人反光過路";
+        } else if (s === "warn_children" || /兒童|學校/.test(p)) {
+          state.scenarioLabel = "實境：學校區雙黃閃燈過路處";
+        } else {
+          state.scenarioLabel = "實境：斑馬線行人過馬路";
+        }
         state.scenarioStopped = true;
         state.brakeTimer = 99;
-        state.scenarioLabel = "實境：斑馬線行人過馬路";
         break;
+      }
 
       case "emergency_hazard":
-        if (/救護車|消防車|警車|緊急服務/.test(p)) {
+        if (/救護車|緊急服務車輛/.test(p)) {
           emergencyGroup.visible = true;
-          state.scenarioLabel = "實境：緊急救援車響號駛近";
+          ambGroup.position.set(1.05, 0, 1.8);
+          state.scenarioLabel = "實境：緊急救援車響號超前";
         } else {
           state.scenarioStopped = true;
           state.targetX = -1.55;
-          state.hazardTimer = 14;
+          state.hazardTimer = 16;
+          state.brakeTimer = 99;
           state.gear = "P";
-          state.scenarioLabel = "實境：壞車亮死火燈停靠路肩";
+          // Show 3D warning triangle ONLY for <=50 km/h warning-triangle questions (never for expressway >50 km/h!)
+          if (/三角形警告牌/.test(p) && !/超過每小時 50 公里/.test(p)) {
+            warningTriangleGroup.visible = true;
+            state.scenarioLabel = "實境：低速路壞車放三角牌";
+          } else {
+            state.scenarioLabel = /危險警告燈|死火燈/.test(p) ? "實境：危險警告燈（死火燈）示範" : "實境：壞車亮死火燈停靠路肩";
+          }
         }
         break;
 
       case "weather_night_rain":
-        if (/雨|濕滑|水膜|颱風/.test(p)) {
-          rainInst.visible = true;
+        if (/大霧.*泊車/.test(p)) {
+          state.scenarioWeather = "fog";
+          state.scenarioStopped = true;
+          state.gear = "P";
+          state.targetX = -1.48;
+          state.scenarioLabel = "實境：大霧路旁泊車亮車燈";
+        } else if (/雨|濕滑|滑溜|水浸|水膜|強風|熱帶氣旋/.test(p)) {
+          rainInst.visible = !/強風|熱帶氣旋/.test(p) || /雨/.test(p);
           state.scenarioWeather = "rain";
-          state.scenarioLabel = "實境：雨天濕滑路面行車";
+          state.scenarioSlow = true;
+          state.scenarioLabel = /強風|熱帶氣旋/.test(p) ? "實境：強風大雨橫風警覺" : "實境：雨天濕滑路面行車";
         } else if (/霧|能見度/.test(p)) {
           state.scenarioWeather = "fog";
+          state.scenarioSlow = true;
           state.scenarioLabel = "實境：大霧低能見度行車";
         } else {
           state.scenarioWeather = "night";
@@ -1315,39 +1576,81 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         }
         break;
 
-      case "highway_overtake":
+      case "highway_overtake": {
         npcCarGroup.visible = true;
-        state.scenarioLabel = /停車距離|兩秒|跟車/.test(p) ? "實境：跟車安全距離示範" : "實境：快速公路超車判斷";
+        const noOvertakeRule =
+          s === "no_overtaking" ||
+          s === "stopping_buses" ||
+          s === "stopping_distance_chart" ||
+          s === "long_vehicle_plate" ||
+          /不應超車|不准超車|不可超車|讓路|停車距離|兩秒|跟車|減慢|切勿.*換線|禁止使用最右線|錯過|最高車速|速度計|三條行車線|純電動車|500 米|港珠澳|的士或公共小型巴士|加速行車線/.test(p);
+        state.scenarioCanOvertake = !noOvertakeRule;
+        if (s === "long_vehicle_plate") {
+          npcCarGroup.visible = false;
+          busGroup.visible = true;
+          busGroup.position.set(-1.05, 0, -5.8);
+          state.scenarioLabel = "實境：長車前方盲點與距離";
+        } else if (/停車距離|兩秒|跟車|的士|切入/.test(p)) {
+          state.scenarioLabel = "實境：跟車安全距離示範";
+        } else if (s === "no_overtaking" || /不應超車/.test(p)) {
+          state.scenarioLabel = "實境：禁超車路段保持跟車";
+        } else if (/禁止使用最右線|三條行車線|500 米|錯過|速度計|最高車速|純電動車|加速行車線|港珠澳/.test(p)) {
+          state.scenarioLabel = "實境：香港快速公路行車規則";
+        } else {
+          state.scenarioLabel = "實境：超車與切線判斷";
+        }
         break;
+      }
 
       case "maneuver_signal":
-        if (/倒車/.test(p)) {
+        if (/剎車燈|停車燈/.test(p)) {
+          state.scenarioWeather = "night";
+          state.scenarioBrakeDemo = true;
+          state.scenarioLabel = "實境：車尾後燈與剎車燈分別";
+        } else if (/閃動大燈/.test(p)) {
+          state.flashTimer = 1.6;
+          state.scenarioLabel = "實境：閃動大燈與安全倒車";
+        } else if (/倒車/.test(p)) {
           state.gear = "R";
-          state.scenarioLabel = "實境：倒車操作示範";
-        } else if (/轉左|逆時針/.test(p)) {
+          state.scenarioLabel = "實境：R 波倒車操作示範";
+        } else if (/警務人員|交通督導員/.test(p)) {
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：遵從警員交通指揮";
+        } else if (/轉左|逆時針/.test(p) && !/轉右/.test(p)) {
           state.blinkerDir = -1;
           state.blinkerTimer = 8;
           state.scenarioLabel = "實境：左轉信號與手號";
-        } else if (/轉右/.test(p)) {
+        } else if (/轉右/.test(p) && !/轉左/.test(p)) {
           state.blinkerDir = 1;
           state.blinkerTimer = 8;
           state.scenarioLabel = "實境：右轉信號與路口";
+        } else if (/慢駛|減速/.test(p)) {
+          state.scenarioSlow = true;
+          state.brakeTimer = 2.5;
+          state.scenarioLabel = "實境：慢駛停車手號與信號";
         } else {
-          state.brakeTimer = 1.5;
-          state.scenarioLabel = "實境：慢駛停車信號";
+          state.blinkerDir = -1;
+          state.blinkerTimer = 6;
+          state.scenarioLabel = "實境：方向指示燈與手號";
         }
         break;
 
       case "roadside_sign_3d":
-        // Keep cruising cleanly up to the 3D sign before answering (no spoiler even for stop_oct!)
+        // Keep cruising cleanly up to the 3D sign on left pavement before answering (zero spoiler!)
+        if (s === "warn_slippery" || s === "warn_loose_chippings" || s === "warn_narrow_both") {
+          state.scenarioSlow = true;
+        }
         state.scenarioLabel = "實境：前方香港交通標誌";
         break;
 
       case "cockpit_safety":
-        if (/停車熄匙|泊車波|P 波/.test(p)) {
+        if (/停車熄匙|泊車波|P 波|下車/.test(p)) {
           state.gear = "P";
           state.scenarioStopped = true;
           state.scenarioLabel = "實境：自動波 P 波停泊檢查";
+        } else if (s === "p_plate" || /暫准駕駛|P 牌/.test(p)) {
+          state.scenarioLabel = "實境：P 牌自動波私家車巡航";
         } else {
           state.scenarioLabel = "實境：1A 自動波安全駕駛";
         }
@@ -1358,20 +1661,39 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         break;
     }
 
+    // Hide expressway overhead gantry on city crossings, intersections & slope parking for HK realism!
+    if (
+      kind === "pedestrian_zebra" ||
+      kind === "traffic_red_amber" ||
+      kind === "traffic_green_arrow" ||
+      kind === "traffic_wigwag" ||
+      kind === "traffic_light_general" ||
+      kind === "yellow_box_rail" ||
+      (kind === "slope_hill" && state.scenarioStopped)
+    ) {
+      gantry.visible = false;
+    }
+    if (kind === "slope_hill" && state.scenarioStopped) {
+      for (const prop of roadsideProps) prop.visible = false;
+    }
+
     // Ground roadside signpost cleanly outside curb on pavement (right side if traffic light occupies left)
+    // Stands cleanly IN FRONT of the outward streetlamps (x = -3.35) AND clear of curb-hugging cars!
     if (trafficGroup.visible && signPostGroup.visible) {
-      signPostGroup.position.set(3.05, 0, state.scenarioStopped ? -4.4 : -7.2);
+      signPostGroup.position.set(3.02, 0, state.scenarioStopped ? -4.4 : -7.2);
       signPostGroup.rotation.y = -0.14;
     } else if (signPostGroup.visible) {
-      signPostGroup.position.set(-3.12, 0, state.scenarioStopped ? -4.4 : -6.8);
+      signPostGroup.position.set(-3.02, 0, state.scenarioStopped ? -4.4 : -6.8);
       signPostGroup.rotation.y = 0.14;
     }
 
-    // Restore tlHead visibility unless wigwag explicitly hid it
-    if (kind !== "traffic_wigwag") {
-      tlHead.visible = true;
-      tlRed.visible = tlAmber.visible = tlGreen.visible = true;
-    }
+    // Snap car pose, slope & speed cleanly on question switch so previous question never bleeds into new one!
+    carRoot.position.x = state.targetX;
+    carRoot.position.z = state.targetZ;
+    carRoot.rotation.y = state.targetCarYaw;
+    worldPivot.rotation.x = state.scenarioSlope;
+    state.roadSpeed = state.scenarioStopped || state.gear === "P" ? 0 : state.gear === "R" ? -2.4 : state.scenarioSlow ? 2.6 : 4.6;
+
     state.activeQuestionId = q.id;
     state.activeQuestion = q;
     snapQuizCameraForScenario();
@@ -1497,9 +1819,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   function snapQuizCameraForScenario() {
     if (state.mode !== "quiz") return;
     if (state.scenario === "slope_hill" && state.scenarioStopped) {
-      // Side-kerb 3/4 view so tilted hill, kerb (or lack of kerb) and front wheel turn angle are crystal clear!
-      camera.position.set(-3.15, 1.52, 3.15);
-      controls.target.set(-1.15, 0.42, -0.25);
+      // Low side-kerb close-up angled along front-left wheel & kerb so wheel turn right/left + slope tilt are unmistakable!
+      camera.position.set(-3.05, 1.12, 1.55);
+      controls.target.set(-1.35, 0.34, -0.55);
     } else {
       // Clean HK driving-simulator rear chase perspective: car cleanly centered, left pavement & road ahead 100% unobstructed!
       camera.position.set(-1.15, 1.85, 6.1);
@@ -1605,14 +1927,28 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         emitSparks(wasPreviouslyWrong ? 24 : combo >= 3 ? 22 : 14, combo >= 3 ? 0xfacc15 : 0x10b981);
       }
 
-      // Scenario-specific RIGHT driving demonstration!
+      // Scenario-specific RIGHT driving demonstration (100% faithful to HK Road Users' Code!)
       if (kind === "traffic_green_arrow") {
-        state.scenarioStopped = false;
-        state.brakeTimer = 0;
-        state.targetCarYaw = 0.28;
-        state.targetX = -1.55;
-        if (!silent) state.boostTimer = 1.1;
-        state.scenarioLabel = "實境：跟左轉綠箭嘴安全左轉";
+        if (/並不打算/.test(p)) {
+          // Stay cleanly in straight lane, NOT entering left-arrow lane!
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：不轉向 · 切勿阻擋箭嘴線";
+        } else if (/右轉袋口位|右轉箭嘴熄滅/.test(p)) {
+          state.scenarioStopped = false;
+          state.brakeTimer = 0;
+          state.targetCarYaw = -0.24;
+          state.targetX = 1.45;
+          if (!silent) state.boostTimer = 0.9;
+          state.scenarioLabel = "實境：安全空隙完成右轉";
+        } else {
+          state.scenarioStopped = false;
+          state.scenarioSlow = true;
+          state.brakeTimer = 0;
+          state.targetCarYaw = 0.16;
+          state.targetX = -1.35;
+          state.scenarioLabel = "實境：跟左轉綠箭嘴安全左轉";
+        }
       } else if (kind === "traffic_red_amber") {
         state.scenarioStopped = true;
         state.brakeTimer = 99;
@@ -1624,7 +1960,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       } else if (kind === "pedestrian_zebra") {
         state.scenarioStopped = true;
         state.brakeTimer = 99;
-        state.scenarioLabel = "實境：斑馬線讓行人先過";
+        state.scenarioLabel = /綠燈剛亮起|長者/.test(p) ? "實境：綠燈仍須讓行人先過" : "實境：斑馬線讓行人先過";
       } else if (kind === "yellow_box_rail") {
         state.scenarioStopped = true;
         state.brakeTimer = 99;
@@ -1640,7 +1976,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
             ? "實境：無石壆斜路 · 前輪向左扭"
             : "實境：下斜靠壆 · 前輪向左扭";
       } else if (kind === "roundabout") {
-        const goRight = /轉右|掉頭/.test(p);
+        const goRight = /轉右|掉頭/.test(p) && !/騎單車|單車/.test(p);
         state.scenarioStopped = false;
         state.brakeTimer = 0;
         state.lane = goRight ? "right" : "left";
@@ -1650,7 +1986,16 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         if (!silent) state.boostTimer = 1.0;
         state.scenarioLabel = goRight ? "實境：迴旋處轉右 · 選用右線" : "實境：迴旋處靠左線進入";
       } else if (kind === "tunnel_overhead") {
-        if (state.lane === "right") {
+        if (state.scenarioStopped) {
+          // Breakdown inside tunnel: stay parked with hazards ON!
+          state.hazardTimer = 16;
+          state.brakeTimer = 99;
+        } else if (/尚未能安全換線/.test(p)) {
+          // q254: stop in current lane before obstruction/red light
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：未能安全切線 · 原線停車等候";
+        } else if (state.lane === "right") {
           state.lane = "left";
           state.targetX = LEFT_LANE_X;
           state.blinkerDir = -1;
@@ -1665,55 +2010,68 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
           if (!silent) state.boostTimer = 1.0;
           state.scenarioLabel = "實境：避開紅交叉封閉車線";
         } else if (!silent) {
-          state.boostTimer = 0.9;
+          state.boostTimer = 0.7;
         }
       } else if (kind === "road_markings_white" && doubleWhiteGroup.visible) {
-        if (dwLeftBroken.visible) {
+        if (dwLeftBroken.visible && !/停車/.test(p)) {
           state.lane = "right";
           state.targetX = RIGHT_LANE_X;
           state.blinkerDir = 1;
           state.blinkerTimer = 1.6;
           if (!silent) state.boostTimer = 1.0;
         } else if (!silent) {
-          state.boostTimer = 0.7;
+          state.boostTimer = 0.6;
         }
-      } else if (kind === "roadside_sign_3d" && s === "stop_oct") {
+      } else if (kind === "roadside_sign_3d" && (s === "stop_oct" || s === "police_stop")) {
         stopLineMesh.position.set(0, 0.012, -1.95);
         stopLineMesh.visible = true;
-        signPostGroup.position.set(-3.12, 0, -4.0);
+        signPostGroup.position.set(-3.02, 0, -4.0);
         state.scenarioStopped = true;
         state.brakeTimer = 99;
-        state.scenarioLabel = "實境：停車標誌 · 停車線前全停";
+        state.scenarioLabel = s === "police_stop" ? "實境：警方路障 · 標誌前停車" : "實境：停車標誌 · 停車線前全停";
+      } else if (kind === "roadside_sign_3d" && s === "give_way") {
+        state.scenarioSlow = true;
+        state.brakeTimer = 2.2;
+        state.scenarioLabel = "實境：讓路標誌 · 減速準備讓路";
       } else if (kind === "highway_overtake") {
-        if (/停車距離|兩秒|跟車/.test(p)) {
-          if (!silent) state.boostTimer = 0.45;
-        } else {
+        if (state.scenarioCanOvertake) {
           state.lane = "right";
           state.targetX = RIGHT_LANE_X;
           state.blinkerDir = 1;
           state.blinkerTimer = 1.8;
           if (!silent) state.boostTimer = 1.25;
+        } else {
+          // Hold safely in left lane (no illegal overtaking on no-overtake / P-plate / following-distance questions!)
+          state.lane = "left";
+          state.targetX = LEFT_LANE_X;
+          if (!silent) state.boostTimer = 0.35;
         }
       } else if (kind === "roadworks") {
         state.lane = "left";
         state.targetX = LEFT_LANE_X;
         state.blinkerDir = -1;
         state.blinkerTimer = 1.4;
-        if (!silent) state.boostTimer = 1.1;
+        if (!silent) state.boostTimer = 0.85;
       } else if (kind === "emergency_hazard" && emergencyGroup.visible) {
         state.targetX = -1.48;
         state.blinkerDir = -1;
         state.blinkerTimer = 1.8;
         state.scenarioLabel = "實境：靠左讓路予緊急車輛";
+      } else if (kind === "emergency_hazard" || (kind === "weather_night_rain" && state.scenarioStopped) || (kind === "maneuver_signal" && state.scenarioStopped)) {
+        state.scenarioStopped = true;
+        state.brakeTimer = 99;
       } else if (kind === "traffic_light_general" && state.scenarioStopped) {
         state.brakeTimer = 99;
       } else if (kind === "cockpit_safety" && state.gear === "P") {
         state.scenarioStopped = true;
+      } else if (kind === "maneuver_signal" && state.gear === "R") {
+        // Keep reversing cleanly in R!
+        state.scenarioStopped = false;
       } else {
         state.gear = "D";
         state.scenarioStopped = false;
         state.brakeTimer = 0;
-        if (!silent) state.boostTimer = wasPreviouslyWrong ? 1.4 : combo >= 3 ? 1.2 : 0.85;
+        if (!silent) state.boostTimer = wasPreviouslyWrong ? 1.2 : combo >= 3 ? 1.0 : 0.75;
       }
     } else if (!silent) {
       // Examiner brake intervention: red brake lights + hazard lights blink!
@@ -1753,6 +2111,32 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       applyAnsweredPosture(isRight, question, { silent: false, combo: state.combo, wasPreviouslyWrong });
       updateHudUI();
       if (prefersReducedMotion()) renderSingleFrame();
+    },
+    _debugState() {
+      const proj = (v) => {
+        const p = v.clone().project(camera);
+        return { x: Number(p.x.toFixed(3)), y: Number(p.y.toFixed(3)), z: Number(p.z.toFixed(3)) };
+      };
+      return {
+        id: state.activeQuestionId,
+        scenario: state.scenario,
+        label: state.scenarioLabel,
+        gear: state.gear,
+        lane: state.lane,
+        stopped: state.scenarioStopped,
+        slope: state.scenarioSlope,
+        parkedWheel: state.scenarioParkedWheel,
+        canOvertake: state.scenarioCanOvertake,
+        weather: state.scenarioWeather,
+        signPostVisible: signPostGroup.visible,
+        trafficVisible: trafficGroup.visible,
+        tunnelVisible: tunnelGroup.visible,
+        zebraVisible: zebraGroup.visible,
+        roundaboutVisible: roundaboutGroup.visible,
+        warningTriangleVisible: warningTriangleGroup.visible,
+        carScreen: proj(new THREE.Vector3(carRoot.position.x, 0.45, carRoot.position.z)),
+        signScreen: signPostGroup.visible ? proj(new THREE.Vector3(signPostGroup.position.x, 1.65, signPostGroup.position.z)) : null
+      };
     }
   };
 
@@ -1809,10 +2193,11 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     if (state.mode === "summary" || state.scenarioStopped || state.gear === "P") {
       desiredSpeed = 0;
     } else if (state.gear === "D") {
-      const base = state.mode === "quiz" ? 4.6 + Math.min(state.combo, 6) * 0.55 : 5.4 + state.readiness * 0.02;
-      desiredSpeed = base + (state.boostTimer > 0 ? 4.5 : 0) - (state.brakeTimer > 0 ? 3.8 : 0);
+      const quizBase = state.scenarioSlow ? 2.6 : 4.6 + Math.min(state.combo, 6) * 0.45;
+      const base = state.mode === "quiz" ? quizBase : 5.4 + state.readiness * 0.02;
+      desiredSpeed = Math.max(0.4, base + (state.boostTimer > 0 ? 4.2 : 0) - (state.brakeTimer > 0 ? 3.5 : 0));
     } else if (state.gear === "R") {
-      desiredSpeed = -2.6;
+      desiredSpeed = -2.4;
     } else if (state.gear === "N") {
       desiredSpeed = 0.6;
     }
@@ -1865,37 +2250,37 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
     {
       let gz = gantry.position.z + state.roadSpeed * dt;
-      const gantryWrapFront = state.mode === "quiz" ? -2.0 : 7.5;
+      const gantryWrapFront = state.mode === "quiz" ? -2.2 : 7.5;
       const gantryResetBack = state.scenario === "tunnel_overhead" ? -18.5 : -24;
       if (gz > gantryWrapFront) gz = gantryResetBack;
       else if (gz < gantryResetBack - 1) gz = gantryWrapFront - 0.5;
       gantry.position.z = gz;
     }
 
-    // Ground-locked 1:1 scrolling for scenario roadside signs, intersections, roadworks & markings when moving!
+    // Ground-locked 1:1 scrolling with tight wrap bounds so props pass beside car cleanly without filling lens!
     if (Math.abs(state.roadSpeed) > 0.05) {
       if (signPostGroup.visible) {
         let sz = signPostGroup.position.z + state.roadSpeed * dt;
-        if (sz > 5.5) sz = -14.5;
-        else if (sz < -15.5) sz = 4.5;
+        if (sz > 2.2) sz = -15.5;
+        else if (sz < -16.5) sz = 1.6;
         signPostGroup.position.z = sz;
       }
       if (trafficGroup.visible) {
         let tz = trafficGroup.position.z + state.roadSpeed * dt;
-        if (tz > 7.5) tz = -15.0;
-        else if (tz < -16.0) tz = 6.5;
+        if (tz > 2.6) tz = -15.5;
+        else if (tz < -16.5) tz = 2.0;
         trafficGroup.position.z = tz;
         if (stopLineMesh.visible) stopLineMesh.position.z = -1.95 + tz;
       }
       if (roadworksGroup.visible) {
         let rz = roadworksGroup.position.z + state.roadSpeed * dt;
-        if (rz > 9.5) rz = -14.0;
-        else if (rz < -15.0) rz = 8.5;
+        if (rz > 4.5) rz = -14.0;
+        else if (rz < -15.0) rz = 3.8;
         roadworksGroup.position.z = rz;
       }
       if (roundaboutGroup.visible) {
         let rbz = roundaboutGroup.position.z + state.roadSpeed * dt;
-        if (rbz > 10.0) rbz = -12.0;
+        if (rbz > 5.5) rbz = -13.5;
         roundaboutGroup.position.z = rbz;
       }
     }
@@ -1904,6 +2289,14 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     }
 
     // Animate scenario-specific dynamic props
+    if (state.scenarioAmberGantry) {
+      const pulse = Math.floor(elapsed * 2.5) % 2 === 0 ? 1.5 : 0.15;
+      laneSignalLeftMat.emissiveIntensity = pulse;
+      laneSignalRightMat.emissiveIntensity = pulse;
+    } else {
+      laneSignalLeftMat.emissiveIntensity = 0.85;
+      laneSignalRightMat.emissiveIntensity = 0.85;
+    }
     if (wigwagBox.visible) {
       const alt = Math.floor(elapsed * 2.4) % 2 === 0;
       wwLeftMat.emissiveIntensity = alt ? 2.8 : 0.08;
@@ -1911,8 +2304,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     }
     if (zebraGroup.visible) {
       beaconGlowMat.emissiveIntensity = 0.7 + (Math.sin(elapsed * 5.2) * 0.5 + 0.5) * 1.6;
-      pedGroup.position.x = Math.sin(elapsed * 0.9) * 1.45;
-      pedGroup.position.y = Math.abs(Math.sin(elapsed * 6.5)) * 0.04;
+      const pedRate = state.scenarioPedSlow ? 0.45 : 0.9;
+      pedGroup.position.x = Math.sin(elapsed * pedRate) * 1.5;
+      pedGroup.position.y = Math.abs(Math.sin(elapsed * pedRate * 7.0)) * 0.04;
     }
     if (roadworksGroup.visible) {
       const diag = Math.floor(elapsed * 2.2) % 2 === 0;
@@ -1920,19 +2314,22 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       rwLampMatB.emissiveIntensity = diag ? 0.15 : 2.6;
     }
     if (emergencyGroup.visible) {
+      // HK Ambulance overtakes FORWARD (-Z) in the right lane (never drives backwards!)
       const alt = Math.floor(elapsed * 6.5) % 2 === 0;
       ambRedMat.emissiveIntensity = alt ? 3.2 : 0.2;
       ambBlueMat.emissiveIntensity = alt ? 0.2 : 3.2;
-      ambGroup.position.z += dt * 1.8;
-      if (ambGroup.position.z > 4.5) ambGroup.position.z = -11;
+      ambGroup.position.z -= dt * 3.8;
+      if (ambGroup.position.z < -15.5) ambGroup.position.z = 2.6;
     }
     if (busGroup.visible) {
-      busGroup.position.z = -5.4 + Math.sin(elapsed * 0.8) * 0.8;
+      busGroup.position.z = -5.6 + Math.sin(elapsed * 0.7) * 0.65;
     }
     if (npcCarGroup.visible) {
-      npcCarGroup.position.z = state.scenarioOutcome === "right"
+      // Only pass the lead NPC car when our car actually moved into the right lane to overtake (zero collision!)
+      const overtakingNow = state.scenarioOutcome === "right" && state.scenarioCanOvertake && state.lane === "right";
+      npcCarGroup.position.z = overtakingNow
         ? THREE.MathUtils.damp(npcCarGroup.position.z, 2.2, 1.4, dt)
-        : -4.4 + Math.sin(elapsed * 1.1) * 0.45;
+        : THREE.MathUtils.damp(npcCarGroup.position.z, -4.8 + Math.sin(elapsed * 1.0) * 0.35, 3.0, dt);
     }
     if (rainInst.visible) {
       for (let i = 0; i < RAIN_COUNT; i++) {
@@ -1957,8 +2354,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
     const latVel = dt > 0.0001 ? (carRoot.position.x - prevX) / dt : 0;
     let steerAngle = THREE.MathUtils.clamp(-latVel * 0.16, -0.34, 0.34);
-    if (state.scenarioParkedWheel === "right") steerAngle = -0.45;
-    else if (state.scenarioParkedWheel === "left") steerAngle = 0.45;
+    if (state.scenarioParkedWheel === "right") steerAngle = -0.52;
+    else if (state.scenarioParkedWheel === "left") steerAngle = 0.52;
 
     for (const fp of frontWheelPivots) {
       fp.rotation.y = THREE.MathUtils.damp(fp.rotation.y, steerAngle, 10, dt);
@@ -1975,8 +2372,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     carBodyGroup.rotation.x = THREE.MathUtils.damp(carBodyGroup.rotation.x, targetPitch, 9, dt);
 
     // Brake, reverse & blinker lamps
-    const braking = state.brakeTimer > 0 || state.gear === "P" || state.scenarioStopped;
-    brakeLightMat.emissiveIntensity = braking ? 2.6 : (state.isDark || state.scenarioWeather === "night") ? 0.9 : 0.28;
+    const demoBrakePulse = state.scenarioBrakeDemo && Math.floor(elapsed * 1.4) % 2 === 0;
+    const braking = state.brakeTimer > 0 || state.gear === "P" || state.scenarioStopped || demoBrakePulse;
+    brakeLightMat.emissiveIntensity = braking ? 2.8 : (state.isDark || state.scenarioWeather === "night") ? 0.9 : 0.28;
     reverseLightMat.emissiveIntensity = state.gear === "R" ? 2.4 : 0.0;
 
     const blinkOn = Math.floor(elapsed * 6) % 2 === 0;
