@@ -792,9 +792,20 @@
     const visual = $("q-visual");
     if (q.sign && window.SIGN_ASSETS[q.sign]) {
       visual.hidden = false;
-      visual.innerHTML = window.renderSignImg(q.sign, { eager: true, hideAlt: !showNow });
+      if (visual.dataset.signKey !== q.sign) {
+        visual.dataset.signKey = q.sign;
+        visual.innerHTML = window.renderSignImg(q.sign, { eager: true, hideAlt: !showNow });
+      } else {
+        const img = visual.querySelector("img.sign-img");
+        if (img) {
+          img.alt = showNow
+            ? window.SIGN_ASSETS[q.sign].alt
+            : "題目交通標誌或道路圖解（點擊放大查看）";
+        }
+      }
     } else {
       visual.hidden = true;
+      visual.dataset.signKey = "";
       visual.innerHTML = "";
     }
     const nextQ = session.questions[idx + 1];
@@ -1026,15 +1037,6 @@
 
     renderCurrentQuestion();
     renderHome();
-    requestAnimationFrame(() => {
-      const panel = $("explain-panel");
-      if (panel && !panel.hidden) {
-        const rect = panel.getBoundingClientRect();
-        if (rect.bottom > window.innerHeight - 16) {
-          panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-      }
-    });
   }
 
   function finishSession({ force = false } = {}) {
