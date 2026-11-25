@@ -190,13 +190,13 @@ export function createHongKongWorldProps({
 
   const gantryColorsTex = makeCanvasTexture(512, 144, (ctx, w, h) => {
     const cols = [
-      { bg: "#0284c7", fg: "#fff", t: "藍 · 主幹路" },
-      { bg: "#007a4d", fg: "#fff", t: "綠 · 快速公路" },
-      { bg: "#f8fafc", fg: "#111827", t: "白 · 區內" },
-      { bg: "#facc15", fg: "#111827", t: "黃 · 臨時" }
+      { bg: "#0284c7", fg: "#fff", t: "九龍 ↗" },
+      { bg: "#007a4d", fg: "#fff", t: "吐露港 ↑" },
+      { bg: "#f8fafc", fg: "#111827", t: "沙田 ←" },
+      { bg: "#facc15", fg: "#111827", t: "改道 →" }
     ];
     const cw = w / 4;
-    ctx.font = "800 21px 'Noto Sans TC', system-ui, sans-serif";
+    ctx.font = "800 24px 'Noto Sans TC', system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     cols.forEach((c, i) => {
@@ -220,13 +220,13 @@ export function createHongKongWorldProps({
     ctx.strokeRect(6, 6, w / 2 - 12, h - 12);
     ctx.strokeStyle = "#111827";
     ctx.strokeRect(w / 2 + 6, 6, w / 2 - 12, h - 12);
-    ctx.font = "800 32px 'Noto Sans TC', system-ui, sans-serif";
+    ctx.font = "800 28px 'Noto Sans TC', system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("紅底文字警告", w * 0.25, h / 2);
+    ctx.fillText("前面道路維修", w * 0.25, h / 2);
     ctx.fillStyle = "#111827";
-    ctx.fillText("黃底臨時改道", w * 0.75, h / 2);
+    ctx.fillText("臨時改道 ↗", w * 0.75, h / 2);
   });
 
   const gantryHarbourTex = makeCanvasTexture(512, 144, (ctx, w, h) => {
@@ -236,23 +236,20 @@ export function createHongKongWorldProps({
     ctx.lineWidth = 8;
     ctx.strokeRect(8, 8, w - 16, h - 16);
     const circles = [
-      { ch: "西", sub: "西隧", x: 112 },
-      { ch: "中", sub: "紅隧", x: 256 },
-      { ch: "東", sub: "東隧", x: 400 }
+      { ch: "西", x: 116 },
+      { ch: "中", x: 256 },
+      { ch: "東", x: 396 }
     ];
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const c of circles) {
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      ctx.arc(c.x, 58, 36, 0, Math.PI * 2);
+      ctx.arc(c.x, h / 2, 42, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#0f172a";
-      ctx.font = "900 38px 'Noto Sans TC', system-ui, sans-serif";
-      ctx.fillText(c.ch, c.x, 60);
-      ctx.fillStyle = "#e0f2fe";
-      ctx.font = "700 22px 'Noto Sans TC', system-ui, sans-serif";
-      ctx.fillText(c.sub, c.x, 118);
+      ctx.font = "900 44px 'Noto Sans TC', system-ui, sans-serif";
+      ctx.fillText(c.ch, c.x, h / 2 + 2);
     }
   });
 
@@ -998,6 +995,7 @@ export function createHongKongWorldProps({
     if (oncomingObj.glareCones) oncomingObj.glareCones.visible = false;
     bridgeGroup.visible = false;
     bridgeGroup.position.set(0, 0, 0);
+    bridgeFascia.visible = true;
     cycleTrackMesh.visible = false;
     cyclistGroup.visible = false;
     cyclistGroup.position.set(-1.68, 0, -4.6);
@@ -1115,6 +1113,7 @@ export function createHongKongWorldProps({
       oncomingCarGroup,
       oncomingGlare: oncomingObj.glareCones,
       bridgeGroup,
+      bridgeFascia,
       cycleTrackMesh,
       cyclistGroup,
       speedCameraGroup,

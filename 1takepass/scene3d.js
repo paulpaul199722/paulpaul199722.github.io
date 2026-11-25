@@ -1782,8 +1782,9 @@ import { createHongKongWorldProps } from "./world3d.js";
           state.scenarioSlow = true;
           state.scenarioLabel = "實境：單程出口 · 不准駛入";
         } else if (s === "height_limit_45" || s === "weight_limit_10t" || s === "no_bicycles") {
-          // q94 / q95 / q93: Real 3D concrete overpass bridge / 4.5m clearance beam!
+          // q94 / q95 / q93: Real 3D concrete overpass bridge (show 4.5m clearance stripe ONLY for height_limit!)
           wg.bridgeGroup.visible = true;
+          wg.bridgeFascia.visible = s === "height_limit_45";
           if (s === "weight_limit_10t") {
             wg.lorryGroup.visible = true;
             wg.lorryGroup.position.set(1.05, 0, -7.8);
@@ -2218,6 +2219,17 @@ import { createHongKongWorldProps } from "./world3d.js";
     worldPivot.rotation.x = state.scenarioSlope;
     state.roadSpeed = state.scenarioStopped || state.gear === "P" ? 0 : state.gear === "R" ? -2.4 : state.scenarioSlow ? 2.6 : 4.6;
 
+    // Anti-spoiler HUD label: on sign/meaning identification questions, keep the top text bar neutral
+    // BEFORE answering (while keeping the full real-world 3D road geometry visible!), then reveal the
+    // specific HK scenario label right AFTER answering to reinforce learning!
+    state.scenarioRevealLabel = state.scenarioLabel;
+    const asksMeaning =
+      /代表甚麼|表示甚麼|甚麼意思|有何意思|甚麼指令|甚麼限制|甚麼情況|甚麼設施|甚麼危險|有何分別|哪一條是|各自代表/.test(p) &&
+      (Boolean(s) || /反光路釘|危險標記|四種底色|行車時間顯示|東.*中.*西|黃色橫條|文字警告/.test(p));
+    if (asksMeaning) {
+      state.scenarioLabel = s ? "3D 路況實境 · 觀察路面與標誌作答" : "3D 路況實境 · 觀察路面細節作答";
+    }
+
     state.activeQuestionId = q.id;
     state.activeQuestion = q;
     snapQuizCameraForScenario();
@@ -2443,6 +2455,8 @@ import { createHongKongWorldProps } from "./world3d.js";
     const s = q?.sign || "";
     const kind = state.scenario;
     state.scenarioOutcome = isRight ? "right" : "wrong";
+    // Reveal the full educational HK scenario label once answered!
+    if (state.scenarioRevealLabel) state.scenarioLabel = state.scenarioRevealLabel;
 
     if (isRight) {
       if (!silent) {
