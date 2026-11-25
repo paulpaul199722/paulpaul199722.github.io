@@ -107,13 +107,14 @@
   const escAttr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
   window.SIGN_ASSETS = ASSETS;
-  window.renderSignImg = (key, { eager = false, thumb = false } = {}) => {
+  window.renderSignImg = (key, { eager = false, thumb = false, hideAlt = false } = {}) => {
     const item = ASSETS[key];
     if (!item) return "";
     const cls = ["sign-img", item.wide ? "is-wide" : "", item.tall ? "is-tall" : "", thumb ? "is-thumb" : ""]
       .filter(Boolean)
       .join(" ");
     const loading = eager ? "eager" : "lazy";
-    return `<img class="${cls}" src="${escAttr(item.src)}" alt="${escAttr(item.alt)}" data-sign-key="${escAttr(key)}" tabindex="0" role="button" aria-label="點擊放大查看圖片" loading="${loading}" decoding="async">`;
+    const altText = hideAlt ? "題目交通標誌或道路圖解（點擊放大查看）" : item.alt;
+    return `<img class="${cls}" src="${escAttr(item.src)}" alt="${escAttr(altText)}" data-sign-key="${escAttr(key)}" tabindex="0" role="button" aria-label="點擊放大查看圖片" loading="${loading}" decoding="async">`;
   };
 })();

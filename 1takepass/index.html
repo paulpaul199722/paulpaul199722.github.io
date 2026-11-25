@@ -12,6 +12,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
   <a class="skip-link" href="#app-root">跳至主要內容</a>
@@ -50,6 +58,17 @@
 
     <!-- ==================== HOME ==================== -->
     <section class="view" id="view-home">
+      <div class="resume-bar" id="resume-session-bar" hidden>
+        <div class="resume-copy">
+          <strong id="resume-session-title">未完成的測驗</strong>
+          <span class="tnum" id="resume-session-meta"></span>
+        </div>
+        <div class="resume-actions">
+          <button class="btn btn-primary btn-sm" id="btn-resume-session" type="button">繼續作答</button>
+          <button class="btn btn-ghost btn-sm" id="btn-discard-session" type="button">放棄</button>
+        </div>
+      </div>
+
       <section class="panel home-launch">
         <div class="launch-top">
           <div>
@@ -95,6 +114,29 @@
           </button>
         </div>
       </section>
+
+      <div id="home-3d-slot" class="stage-3d-slot">
+        <div class="stage-3d-shell" id="stage-3d-shell" data-mode="home">
+          <div class="stage-3d-viewport" id="stage-3d-viewport"></div>
+          <div class="stage-3d-top">
+            <span class="stage-3d-pill" id="stage-3d-status">3D 模擬車道 · D 波靠左巡航</span>
+            <span class="stage-3d-pill tnum" id="stage-3d-speed">D · 44 km/h</span>
+          </div>
+          <div class="stage-3d-bottom">
+            <div class="stage-3d-controls">
+              <div class="gear-strip" role="group" aria-label="自動波波檔">
+                <button class="gear-btn" data-gear="P" type="button" aria-pressed="false">P</button>
+                <button class="gear-btn" data-gear="R" type="button" aria-pressed="false">R</button>
+                <button class="gear-btn" data-gear="N" type="button" aria-pressed="false">N</button>
+                <button class="gear-btn is-active" data-gear="D" type="button" aria-pressed="true">D</button>
+              </div>
+              <button class="stage-3d-act" id="btn-3d-lane" type="button">切右線超車</button>
+              <button class="stage-3d-act" id="btn-3d-honk" type="button">呠呠</button>
+            </div>
+            <span class="stage-3d-hint">拖曳轉角度 · 點擊架車</span>
+          </div>
+        </div>
+      </div>
 
       <section class="group-section">
         <div class="sec-head">
@@ -149,6 +191,7 @@
           <div class="quiz-right tnum">
             <span class="combo-tag" id="quiz-combo-pill" hidden><span id="quiz-combo-num">0</span> 連中</span>
             <span class="score-live" id="quiz-score-live">答對 0</span>
+            <button class="jump-toggle" id="btn-toggle-quiz-3d" type="button" aria-pressed="true" title="顯示或收起 3D 車道">3D</button>
             <button class="jump-toggle" id="btn-toggle-dots" type="button" aria-expanded="false" aria-controls="quiz-dots-panel">
               <span id="quiz-progress-text">1 / 20</span>
               <span class="btn-ic chev-ic" data-icon="chevDown"></span>
@@ -165,6 +208,8 @@
         </div>
       </div>
 
+      <div id="quiz-3d-slot" class="stage-3d-slot"></div>
+
       <article class="q-card" id="question-card">
         <div class="q-meta-line" id="q-meta"></div>
 
@@ -180,6 +225,7 @@
             <span class="explain-status" id="explain-status"></span>
             <span class="explain-page tnum" id="explain-page"></span>
           </div>
+          <p class="explain-emotion" id="explain-emotion" hidden></p>
 
           <p class="explain-wrong-self" id="explain-chosen-wrong" hidden></p>
           <p class="explain-main" id="explain-right-text"></p>
@@ -221,6 +267,7 @@
 
         <div class="quiz-foot">
           <button class="btn btn-ghost btn-sm" id="btn-prev-q" type="button" hidden>上一題</button>
+          <span class="kbd-hint" aria-hidden="true">A / B / C 或 1–3 作答 · Enter 下一題</span>
           <div class="spacer"></div>
           <button class="btn btn-primary" id="btn-next-q" type="button" hidden>下一題</button>
           <button class="btn btn-cobalt" id="btn-submit-exam" type="button" hidden>交卷</button>
@@ -243,6 +290,7 @@
             <button class="btn btn-ghost" id="btn-summary-home" type="button">返回練習</button>
           </div>
         </div>
+        <div id="summary-3d-slot" class="stage-3d-slot stage-3d-summary-slot"></div>
       </div>
 
       <section class="group-section">
@@ -252,6 +300,7 @@
             <button class="filter-btn is-active" data-sfilter="all" type="button">全部</button>
             <button class="filter-btn" data-sfilter="wrong" type="button">只看錯題</button>
             <button class="filter-btn" data-sfilter="image" type="button">圖片題</button>
+            <button class="filter-btn" id="btn-toggle-expand-summary" type="button">展開全部</button>
           </div>
         </div>
         <div class="review-list" id="summary-review-list"></div>
@@ -280,6 +329,7 @@
             <button class="filter-btn is-active" data-mfilter="active" type="button">待擊破</button>
             <button class="filter-btn" data-mfilter="all" type="button">全部曾錯</button>
             <button class="filter-btn" data-mfilter="image" type="button">圖片題</button>
+            <button class="filter-btn" data-mfilter="text" type="button">文字題</button>
           </div>
         </div>
         <div class="review-list" id="mistake-list"></div>
@@ -289,9 +339,12 @@
     <!-- ==================== CONTRAST STUDY ==================== -->
     <section class="view" id="view-study" hidden>
       <section class="group-section">
-        <div class="sec-head">
-          <h2>8 組易混淆對比卡</h2>
-          <span class="sec-sub">並排睇清分別</span>
+        <div class="sec-head wrap">
+          <div>
+            <h2>8 組易混淆對比卡</h2>
+            <span class="sec-sub">並排睇清分別 · 點擊圖片可放大</span>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-study-drill-signs" type="button">專攻圖片路牌題</button>
         </div>
         <div class="contrast-grid" id="contrast-grid"></div>
       </section>
@@ -371,5 +424,6 @@
   <script src="./signs.js"></script>
   <script src="./questions.js"></script>
   <script src="./app.js"></script>
+  <script type="module" src="./scene3d.js"></script>
 </body>
 </html>

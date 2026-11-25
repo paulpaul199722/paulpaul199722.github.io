@@ -55,6 +55,10 @@
   let session = null;
   let summaryFilter = "all";
   let mistakeFilter = "active";
+  let mistakeReasonFilter = null;
+  let summarySourceTab = "home";
+  let lastEmotionText = "";
+  let quiz3dOn = localStorage.getItem("onetake_quiz_3d") !== "off";
   let noticeTimer = null;
   let lastFocusedEl = null;
 
@@ -155,11 +159,17 @@
         beep(250, now + 0.09, 0.14, 0.035, "sine");
       } else if (kind === "pass") {
         [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => beep(f, now + i * 0.08, 0.25));
+      } else if (kind === "horn") {
+        beep(440, now, 0.09, 0.055, "sawtooth");
+        beep(554.37, now, 0.09, 0.045, "triangle");
+        beep(440, now + 0.12, 0.13, 0.055, "sawtooth");
+        beep(554.37, now + 0.12, 0.13, 0.045, "triangle");
       }
     } catch (err) {
       console.warn("Audio feedback unavailable:", err);
     }
   }
+  window.playOneTakeHorn = () => playTone("horn");
 
   function burstConfetti(count = 44) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -241,7 +251,12 @@
       dot.classList.toggle("is-online", ok === true);
       dot.classList.toggle("is-error", ok === false);
     }
-    if ($("sync-label")) $("sync-label").textContent = text;
+    if ($("sync-label")) {
+      $("sync-label").textContent = profileId !== "default" && ok === true ? `${text} · ${profileId}` : text;
+    }
+    if ($("btn-sync")) {
+      $("btn-sync").title = `同步狀態：${text}（代號：${profileId}）`;
+    }
     if ($("sync-status-detail")) {
       $("sync-status-detail").innerHTML =
         `狀態：<strong>${esc(text)}</strong> · 代號：<code>${esc(profileId)}</code> · 已記錄：<strong class="tnum">${Object.keys(progressMap).length} / ${window.QUESTIONS.length}</strong>`;
@@ -501,17 +516,57 @@
     return a;
   }
 
-  function buildMockExam() {
+  function pickEmotion({ isRight, combo, wasPreviouslyWrong }) {
+    const bank = window.EMOTIONAL_BANK;
+    if (!bank) return null;
+    let pool, style;
+    if (!isRight) { pool = bank.comfort; style = "is-wrong"; }
+    else if (wasPreviouslyWrong) { pool = bank.redeemed; style = "is-redeemed"; }
+    else if (combo >= 6) { pool = bank.godlike; style = "is-streak"; }
+    else if (combo >= 3) { pool = bank.streak; style = "is-streak"; }
+    else { pool = bank.fresh; style = "is-right"; }
+    if (!pool?.length) return null;
+
+    let pick = pool[Math.floor(Math.random() * pool.length)];
+    for (let i = 0; i < 6 && pick.text === lastEmotionText; i++) {
+      pick = pool[Math.floor(Math.random() * pool.length)];
+    }
+    lastEmotionText = pick.text;
+    return {
+      badge: pick.badge.replace(/\{combo\}/g, String(combo)),
+      text: pick.text.replace(/\{combo\}/g, String(combo)),
+      style
+    };
+  }
+
+  function prioritizePool(qs, limit = 20) {
+    const now = Date.now();
     const score = (q) => {
       const p = progressMap[q.id];
-      if (!p) return 2 + Math.random();
-      if (p.box === 0) return 3.2 + Math.random();
-      if (new Date(p.next_review_at).getTime() <= Date.now()) return 2.5 + Math.random();
-      return (5 - p.box) * 0.3 + Math.random();
+      if (!p) return 2.2 + Math.random(); // prioritize unseen
+      if (p.box === 0) return 3.6 + Math.random(); // highest: active mistakes
+      if (new Date(p.next_review_at).getTime() <= now) return 2.8 + Math.random(); // due for SRS
+      return (5 - p.box) * 0.35 + Math.random(); // low mastery before fully mastered
     };
-    const imgs = [...window.QUESTIONS.filter((q) => q.type === "image")].sort((a, b) => score(b) - score(a)).slice(0, 10);
-    const txts = [...window.QUESTIONS.filter((q) => q.type === "text")].sort((a, b) => score(b) - score(a)).slice(0, 10);
+    return shuffle([...qs].sort((a, b) => score(b) - score(a)).slice(0, limit));
+  }
+
+  function buildMockExam() {
+    const imgs = prioritizePool(window.QUESTIONS.filter((q) => q.type === "image"), 10);
+    const txts = prioritizePool(window.QUESTIONS.filter((q) => q.type === "text"), 10);
     return shuffle([...imgs, ...txts]);
+  }
+
+  function syncQuiz3DVisibility() {
+    const btn = $("btn-toggle-quiz-3d");
+    if (btn) {
+      btn.setAttribute("aria-pressed", String(quiz3dOn));
+      btn.textContent = quiz3dOn ? "3D" : "3D 關";
+    }
+    if (!$("view-quiz").hidden) {
+      if (quiz3dOn) window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
+      else window.OneTake3D?.mount(null);
+    }
   }
 
   function showView(v) {
@@ -520,12 +575,20 @@
       const el = $(`view-${id}`);
       if (el) el.hidden = id !== v;
     });
+    const highlightTab = v === "summary" ? summarySourceTab : v;
     document.querySelectorAll(".nav-tab").forEach((b) => {
-      const active = b.dataset.tab === v;
+      const active = b.dataset.tab === highlightTab;
       b.classList.toggle("is-active", active);
       if (active) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
     });
+    if (v === "home") {
+      window.OneTake3D?.mount("home");
+    } else if (v === "quiz") {
+      syncQuiz3DVisibility();
+    } else if (v !== "summary") {
+      window.OneTake3D?.mount(null);
+    }
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
@@ -552,7 +615,19 @@
   }
 
   // ==================== RENDER HOME ====================
+  function renderResumeBar() {
+    const bar = $("resume-session-bar");
+    if (!bar) return;
+    const answeredCount = session ? Object.keys(session.answers).length : 0;
+    const resumable = !!session && !session.submitted && answeredCount > 0 && answeredCount < session.questions.length;
+    bar.hidden = !resumable;
+    if (!resumable) return;
+    $("resume-session-title").textContent = `未完成的${session.label}`;
+    $("resume-session-meta").textContent = `進度：已答 ${answeredCount} / ${session.questions.length} 題（停留於第 ${session.index + 1} 題）`;
+  }
+
   function renderHome() {
+    renderResumeBar();
     const total = window.QUESTIONS.length;
     const mastered = window.QUESTIONS.filter((q) => (progressMap[q.id]?.box || 0) >= 3).length;
     const activeMistakes = getActiveMistakes();
@@ -561,6 +636,7 @@
 
     $("readiness-pct").textContent = `${readiness}%`;
     $("readiness-bar-fill").style.transform = `scaleX(${(readiness / 100).toFixed(4)})`;
+    window.OneTake3D?.setReadiness(readiness);
 
     $("stat-mastered").textContent = `${mastered} / ${total}`;
     $("stat-exams-passed").textContent = `${stats.exams_passed || 0} 次`;
@@ -610,10 +686,11 @@
       btn.onclick = () => {
         const cat = window.CATEGORIES.find((c) => c.id === btn.dataset.chapter);
         if (!cat) return;
+        const allCatQs = window.QUESTIONS.filter((q) => q.category === cat.id);
         startSession({
           mode: "chapter",
-          label: cat.short,
-          questions: shuffle(window.QUESTIONS.filter((q) => q.category === cat.id)),
+          label: `${cat.short} · 智能練習`,
+          questions: prioritizePool(allCatQs, 20),
           revealAtEnd: false
         });
       };
@@ -670,10 +747,12 @@
     if (prevProg?.wrong_count > 0) metaParts.push(`<span class="meta-err tnum">曾錯 ${prevProg.wrong_count} 次</span>`);
     $("q-meta").innerHTML = metaParts.join(`<span class="meta-sep" aria-hidden="true">·</span>`);
 
+    const showNow = !!ans && !session.revealAtEnd;
+
     const visual = $("q-visual");
     if (q.sign && window.SIGN_ASSETS[q.sign]) {
       visual.hidden = false;
-      visual.innerHTML = window.renderSignImg(q.sign, { eager: true });
+      visual.innerHTML = window.renderSignImg(q.sign, { eager: true, hideAlt: !showNow });
     } else {
       visual.hidden = true;
       visual.innerHTML = "";
@@ -686,7 +765,6 @@
 
     $("q-prompt").textContent = q.prompt;
 
-    const showNow = !!ans && !session.revealAtEnd;
     const list = $("options-list");
     list.innerHTML = ["A", "B", "C"].map((letter) => {
       let cls = "option-btn";
@@ -732,6 +810,18 @@
 
       $("explain-page").textContent = `${shortOrigin(q)} · P.${q.source.page}`;
 
+      const emoEl = $("explain-emotion");
+      if (emoEl) {
+        if (ans.emotion) {
+          emoEl.hidden = false;
+          emoEl.className = `explain-emotion ${ans.emotion.style}`;
+          emoEl.innerHTML = `<strong>${esc(ans.emotion.badge)}</strong>${esc(ans.emotion.text)}`;
+        } else {
+          emoEl.hidden = true;
+          emoEl.innerHTML = "";
+        }
+      }
+
       // Show only the reason why the user's chosen option is wrong (avoid repeating option letter already highlighted above)
       if (!ans.isRight && q.whyWrong[ans.chosen]) {
         chosenWrongEl.hidden = false;
@@ -766,11 +856,11 @@
       $("explain-source-meta").textContent = fullSourceMeta(q, { includePage: false });
       $("explain-source-quote").textContent = `「${q.source.quote}」`;
 
-      // Reflection fold (only on wrong answers or questions that already have a saved reason/note)
+      // Reflection fold: open automatically on wrong answers so 1-tap mistake tagging is effortless
       const prog = progressMap[q.id];
       if (!ans.isRight || prog?.personal_note || prog?.mistake_reason) {
         reflectFold.hidden = false;
-        reflectFold.open = false;
+        reflectFold.open = !ans.isRight;
         renderReflection(q.id, prog);
       } else {
         reflectFold.hidden = true;
@@ -870,22 +960,47 @@
 
     session.combo = isRight ? session.combo + 1 : 0;
     const { wasPreviouslyWrong } = recordAnswer(q.id, chosen, isRight);
-    session.answers[idx] = { chosen, isRight, wasPreviouslyWrong };
+    const emotion = pickEmotion({ isRight, combo: session.combo, wasPreviouslyWrong });
+    session.answers[idx] = { chosen, isRight, emotion, wasPreviouslyWrong };
 
     if (isRight) {
       playTone(wasPreviouslyWrong ? "redeemed" : "correct", session.combo);
     } else {
       playTone("wrong");
     }
+    window.OneTake3D?.reactAnswer({ isRight, combo: session.combo, wasPreviouslyWrong });
 
     renderCurrentQuestion();
     renderHome();
+    requestAnimationFrame(() => {
+      const panel = $("explain-panel");
+      if (panel && !panel.hidden) {
+        const rect = panel.getBoundingClientRect();
+        if (rect.bottom > window.innerHeight - 16) {
+          panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
+    });
   }
 
-  function finishSession() {
+  function finishSession({ force = false } = {}) {
     if (!session || session.submitted) return;
-    session.submitted = true;
     const total = session.questions.length;
+    if (session.revealAtEnd && !force) {
+      const firstUnanswered = session.questions.findIndex((_, i) => !session.answers[i]);
+      if (firstUnanswered !== -1) {
+        const remaining = total - Object.keys(session.answers).length;
+        session.index = firstUnanswered;
+        renderCurrentQuestion();
+        showNotice(`尚有 ${remaining} 題未作答，已跳至第 ${firstUnanswered + 1} 題。`, {
+          ctaText: "仍要交卷",
+          onCta: () => finishSession({ force: true }),
+          duration: 9000
+        });
+        return;
+      }
+    }
+    session.submitted = true;
     if (session.revealAtEnd) {
       session.questions.forEach((q, i) => {
         const a = session.answers[i];
@@ -922,6 +1037,7 @@
     };
     syncExamRecord(examRec);
     summaryFilter = "all";
+    summarySourceTab = "home";
     renderSummary(examRec);
     renderAll();
     showView("summary");
@@ -934,6 +1050,7 @@
     const wrongs = answers.filter((a) => !a.isRight);
 
     $("summary-hero").classList.toggle("is-fail", !passed);
+    window.OneTake3D?.mount("summary", { passed });
     $("summary-status-pill").textContent = passed
       ? (total === EXAM_LEN ? "模擬試及格" : "已達標")
       : "未達標";
@@ -960,7 +1077,7 @@
       retryBtn.hidden = true;
     }
 
-    document.querySelectorAll("#summary-filters .filter-btn").forEach((p) => {
+    document.querySelectorAll("#summary-filters .filter-btn[data-sfilter]").forEach((p) => {
       const active = p.dataset.sfilter === summaryFilter;
       p.classList.toggle("is-active", active);
       p.setAttribute("aria-pressed", String(active));
@@ -976,10 +1093,32 @@
     });
 
     const listEl = $("summary-review-list");
+    const expandBtn = $("btn-toggle-expand-summary");
     if (filtered.length) {
-      listEl.innerHTML = filtered.map((r) => buildReviewCard(Q_BY_ID[r.qId], r, !r.isRight)).join("");
+      let openedWrongs = 0;
+      listEl.innerHTML = filtered.map((r) => {
+        const shouldOpen = !r.isRight && openedWrongs < 3;
+        if (shouldOpen) openedWrongs++;
+        return buildReviewCard(Q_BY_ID[r.qId], r, shouldOpen);
+      }).join("");
       bindReviewNotes(listEl);
+      if (expandBtn) {
+        expandBtn.hidden = false;
+        const syncExpandText = () => {
+          const items = Array.from(listEl.querySelectorAll("details.review-item"));
+          const allOpen = items.length > 0 && items.every((d) => d.open);
+          expandBtn.textContent = allOpen ? "全部收起" : "展開全部";
+        };
+        syncExpandText();
+        expandBtn.onclick = () => {
+          const items = Array.from(listEl.querySelectorAll("details.review-item"));
+          const allOpen = items.every((d) => d.open);
+          items.forEach((d) => { d.open = !allOpen; });
+          syncExpandText();
+        };
+      }
     } else {
+      if (expandBtn) expandBtn.hidden = true;
       listEl.innerHTML = `
         <div class="empty-state">
           <span>此篩選條件下未有符合題目。</span>
@@ -996,7 +1135,6 @@
     const chosen = info ? info.chosen : prog?.last_selected_option;
     const reasonLabel = window.MISTAKE_REASONS.find((r) => r.id === prog?.mistake_reason)?.label;
 
-    // Header summarizes outcome ONCE (no duplicate "你選 X" or repeated page number below)
     let statusHtml = "";
     if (isWrong) {
       const wrongTag = chosen && chosen !== "未答" ? `誤選 ${esc(chosen)}` : "未作答";
@@ -1005,14 +1143,21 @@
       statusHtml = `<span class="ans-right">答對 ${q.answer}</span>`;
     }
 
-    const wrongLine = isWrong && chosen && q.whyWrong[chosen]
-      ? `<p class="explain-wrong-self"><strong>錯因：</strong>${esc(q.whyWrong[chosen])}</p>`
-      : "";
+    const wrongItems = ["A", "B", "C"]
+      .filter((l) => l !== q.answer)
+      .map((l) => {
+        const chosenTag = l === chosen ? `<strong>[你選]</strong> ` : "";
+        const optText = q.options[l] ? `（${esc(q.options[l])}）` : "";
+        return `<li><span class="wrong-tag">${l}</span><span>${chosenTag}${esc(q.whyWrong[l] || "")}${optText}</span></li>`;
+      })
+      .join("");
 
-    // Show concise mnemonic hook (or whyRight if no hook) — avoids repeating full correct answer already shown in header
-    const takeawayHtml = q.memoryHook
-      ? `<p class="explain-hook"><span class="hook-k">口訣</span><span>${esc(q.memoryHook)}</span></p>`
-      : `<p class="explain-main">${esc(q.whyRight)}</p>`;
+    const reasonChipsHtml = prog
+      ? `<div class="reason-chips">${window.MISTAKE_REASONS.map((r) => {
+          const selected = prog.mistake_reason === r.id;
+          return `<button type="button" class="reason-chip js-review-reason ${selected ? "is-selected" : ""}" aria-pressed="${selected}" data-qid="${q.id}" data-reason="${r.id}">${esc(r.label)}</button>`;
+        }).join("")}</div>`
+      : "";
 
     return `
       <details class="review-item ${isWrong ? "is-wrong" : "is-right"}" ${openDefault ? "open" : ""}>
@@ -1030,14 +1175,16 @@
         </summary>
         <div class="review-body">
           ${q.sign && window.SIGN_ASSETS[q.sign] ? `<div class="q-visual">${window.renderSignImg(q.sign)}</div>` : ""}
-          ${wrongLine}
-          ${takeawayHtml}
+          <p class="explain-main"><strong>正解 ${q.answer}：</strong>${esc(q.whyRight)}</p>
+          ${wrongItems ? `<ul class="other-wrong-list">${wrongItems}</ul>` : ""}
+          ${q.memoryHook ? `<p class="explain-hook"><span class="hook-k">口訣</span><span>${esc(q.memoryHook)}</span></p>` : ""}
           <div class="source-block">
             <div class="source-loc">${esc(fullSourceMeta(q, { includePage: true }))}</div>
             <blockquote class="source-quote">「${esc(q.source.quote)}」</blockquote>
           </div>
           ${prog ? `<div class="review-note-wrap">
-            <span class="review-note-meta tnum">個人筆記 · 對 ${prog.correct_count} / 錯 ${prog.wrong_count}</span>
+            <span class="review-note-meta tnum">錯因與筆記 · 對 ${prog.correct_count} / 錯 ${prog.wrong_count}</span>
+            ${reasonChipsHtml}
             <div class="note-row">
               <input type="text" class="text-input js-review-note" data-qid="${q.id}" value="${esc(prog.personal_note || "")}" placeholder="寫低防錯提醒…" maxlength="120" autocomplete="off" aria-label="個人筆記">
               <button type="button" class="btn btn-secondary btn-sm js-save-review-note" data-qid="${q.id}">儲存</button>
@@ -1048,6 +1195,22 @@
   }
 
   function bindReviewNotes(container) {
+    container.querySelectorAll(".js-review-reason").forEach((chip) => {
+      chip.onclick = async () => {
+        const qId = chip.dataset.qid;
+        const reasonId = chip.dataset.reason;
+        if (!progressMap[qId]) return;
+        const nextVal = progressMap[qId].mistake_reason === reasonId ? null : reasonId;
+        progressMap[qId].mistake_reason = nextVal;
+        progressMap[qId].updated_at = new Date().toISOString();
+        container.querySelectorAll(`.js-review-reason[data-qid="${qId}"]`).forEach((b) => {
+          const sel = b.dataset.reason === nextVal;
+          b.classList.toggle("is-selected", sel);
+          b.setAttribute("aria-pressed", String(sel));
+        });
+        await syncQuestionProgress(progressMap[qId]);
+      };
+    });
     container.querySelectorAll(".js-save-review-note").forEach((btn) => {
       const qId = btn.dataset.qid;
       const input = container.querySelector(`.js-review-note[data-qid="${qId}"]`);
@@ -1088,36 +1251,72 @@
     const rc = {};
     Object.values(progressMap).forEach((p) => { if (p.mistake_reason) rc[p.mistake_reason] = (rc[p.mistake_reason] || 0) + 1; });
     const entries = window.MISTAKE_REASONS.filter((r) => rc[r.id] > 0);
+    if (mistakeReasonFilter && !rc[mistakeReasonFilter]) mistakeReasonFilter = null;
     const reasonEl = $("reason-stats");
     if (entries.length) {
       reasonEl.hidden = false;
-      reasonEl.innerHTML = entries.map((r) => `<span class="reason-stat-pill tnum">${esc(r.label)} × ${rc[r.id]}</span>`).join("");
+      reasonEl.innerHTML = entries
+        .map((r) => {
+          const active = mistakeReasonFilter === r.id;
+          return `<button type="button" class="reason-stat-pill tnum ${active ? "is-active" : ""}" aria-pressed="${active}" data-rfilter="${r.id}">${esc(r.label)} × ${rc[r.id]}</button>`;
+        })
+        .join("");
+      reasonEl.querySelectorAll(".reason-stat-pill").forEach((b) => {
+        b.onclick = () => {
+          mistakeReasonFilter = mistakeReasonFilter === b.dataset.rfilter ? null : b.dataset.rfilter;
+          renderMistakeBook();
+        };
+      });
     } else {
       reasonEl.hidden = true;
       reasonEl.innerHTML = "";
     }
 
+    const activePool = getActiveMistakes();
+    const everPool = getAllEverWrong();
+    const filterCounts = {
+      active: activePool.length,
+      all: everPool.length,
+      image: everPool.filter((q) => q.type === "image").length,
+      text: everPool.filter((q) => q.type === "text").length
+    };
+    const filterLabels = { active: "待擊破", all: "全部曾錯", image: "圖片題", text: "文字題" };
+
     document.querySelectorAll("#mistake-filters .filter-btn").forEach((p) => {
-      const active = p.dataset.mfilter === mistakeFilter;
+      const f = p.dataset.mfilter;
+      const active = f === mistakeFilter;
+      p.textContent = filterCounts[f] > 0 ? `${filterLabels[f]} (${filterCounts[f]})` : filterLabels[f];
       p.classList.toggle("is-active", active);
       p.setAttribute("aria-pressed", String(active));
-      p.onclick = () => { mistakeFilter = p.dataset.mfilter; renderMistakeBook(); };
+      p.onclick = () => { mistakeFilter = f; renderMistakeBook(); };
     });
 
-    let list = mistakeFilter === "active" ? getActiveMistakes() : getAllEverWrong();
-    if (mistakeFilter === "image") list = getAllEverWrong().filter((q) => q.type === "image");
+    let list = mistakeFilter === "active" ? activePool : everPool;
+    if (mistakeFilter === "image") list = everPool.filter((q) => q.type === "image");
+    else if (mistakeFilter === "text") list = everPool.filter((q) => q.type === "text");
+    if (mistakeReasonFilter) {
+      list = list.filter((q) => progressMap[q.id]?.mistake_reason === mistakeReasonFilter);
+    }
 
     const box = $("mistake-list");
     if (list.length) {
       box.innerHTML = list.map((q) => buildReviewCard(q, null, false)).join("");
       bindReviewNotes(box);
     } else {
-      const msg = mistakeFilter === "active" ? "目前零待擊破錯題。" : "暫無錯題紀錄，先考一卷檢測盲點。";
+      const msg = mistakeReasonFilter
+        ? "此錯因分類下未有符合錯題。"
+        : mistakeFilter === "active"
+        ? "目前零待擊破錯題。"
+        : "暫無錯題紀錄，先考一卷檢測盲點。";
       box.innerHTML = `
         <div class="empty-state">
           <span>${msg}</span>
-          <button type="button" class="btn btn-primary btn-sm js-empty-launch">開始模擬試</button>
+          ${mistakeReasonFilter
+            ? `<button type="button" class="btn btn-secondary btn-sm js-clear-rfilter">清除錯因篩選</button>`
+            : `<button type="button" class="btn btn-primary btn-sm js-empty-launch">開始模擬試</button>`}
         </div>`;
+      const clearBtn = box.querySelector(".js-clear-rfilter");
+      if (clearBtn) clearBtn.onclick = () => { mistakeReasonFilter = null; renderMistakeBook(); };
       const btn = box.querySelector(".js-empty-launch");
       if (btn) btn.onclick = launchExam;
     }
@@ -1183,6 +1382,7 @@
         const rec = examHistory[Number(b.dataset.hidx)];
         if (!rec) return;
         summaryFilter = "all";
+        summarySourceTab = "history";
         renderSummary(rec);
         showView("summary");
       };
@@ -1317,7 +1517,7 @@
     const target = restoreFocus ? lastFocusedEl : null;
     lastFocusedEl = null;
     if (target && typeof target.focus === "function") {
-      requestAnimationFrame(() => target.focus());
+      requestAnimationFrame(() => target.focus({ preventScroll: true }));
     }
   }
 
@@ -1355,9 +1555,10 @@
       !!imgEl.closest("#view-quiz") &&
       !!session &&
       (!session.answers[session.index] || session.revealAtEnd);
+    const fullAssetAlt = imgEl.dataset?.signKey && window.SIGN_ASSETS?.[imgEl.dataset.signKey]?.alt;
     captionEl.textContent = inUnrevealedQuiz
       ? "點擊圖片切換放大倍率 · 按 Esc 關閉"
-      : (imgEl.alt || "圖片放大檢視");
+      : (fullAssetAlt || imgEl.alt || "圖片放大檢視");
 
     setLightboxZoom(false);
     backdrop.hidden = false;
@@ -1415,6 +1616,7 @@
     themeBtn.setAttribute("aria-label", isDark ? "切換至淺色主題" : "切換至深色主題");
     themeBtn.title = isDark ? "切換至淺色主題" : "切換至深色主題";
     updateThemeColorMeta(isDark);
+    window.OneTake3D?.setTheme(isDark);
 
     if (suppressTransitions) {
       void root.offsetHeight;
@@ -1460,18 +1662,48 @@
     $("btn-new-exam").onclick = launchExam;
     $("btn-history-new-exam").onclick = launchExam;
 
-    $("btn-start-srs").onclick = () => {
-      let pool = getDueQuestions();
-      if (pool.length < 10) {
-        const extras = shuffle(window.QUESTIONS.filter((q) => !pool.some((p) => p.id === q.id))).slice(0, 12 - pool.length);
-        pool = [...pool, ...extras];
-      }
-      startSession({ mode: "srs", label: "到期複習", questions: pool.slice(0, 15), revealAtEnd: false });
+    $("btn-resume-session").onclick = () => {
+      if (!session || session.submitted) return;
+      $("quiz-mode-label").textContent = session.label;
+      showView("quiz");
+      renderCurrentQuestion();
+    };
+    $("btn-discard-session").onclick = () => {
+      session = null;
+      renderHome();
     };
 
-    $("btn-mode-signs").onclick = () => startSession({ mode: "signs", label: "圖片路牌", questions: shuffle(window.QUESTIONS.filter((q) => q.type === "image")).slice(0, 20), revealAtEnd: false });
-    $("btn-mode-text").onclick = () => startSession({ mode: "practice", label: "文字數字", questions: shuffle(window.QUESTIONS.filter((q) => q.type === "text")).slice(0, 20), revealAtEnd: false });
-    $("btn-mode-traps").onclick = () => startSession({ mode: "practice", label: "高頻陷阱", questions: shuffle(window.QUESTIONS.filter((q) => !!q.trapTag)).slice(0, 20), revealAtEnd: false });
+    $("btn-start-srs").onclick = () => {
+      const due = getDueQuestions();
+      if (due.length > 0) {
+        startSession({ mode: "srs", label: "到期複習", questions: due.slice(0, 20), revealAtEnd: false });
+        return;
+      }
+      startSession({
+        mode: "srs",
+        label: "智能精選複習",
+        questions: prioritizePool(window.QUESTIONS, 15),
+        revealAtEnd: false
+      });
+      showNotice("目前零到期複習題，已自動精選 15 題未熟題目溫習。", { duration: 4500 });
+    };
+
+    const launchSigns = () => startSession({
+      mode: "signs",
+      label: "圖片路牌",
+      questions: prioritizePool(window.QUESTIONS.filter((q) => q.type === "image"), 20),
+      revealAtEnd: false
+    });
+    $("btn-mode-signs").onclick = launchSigns;
+    if ($("btn-study-drill-signs")) $("btn-study-drill-signs").onclick = launchSigns;
+    $("btn-mode-text").onclick = () => startSession({ mode: "practice", label: "文字數字", questions: prioritizePool(window.QUESTIONS.filter((q) => q.type === "text"), 20), revealAtEnd: false });
+    $("btn-mode-traps").onclick = () => startSession({ mode: "practice", label: "高頻陷阱", questions: prioritizePool(window.QUESTIONS.filter((q) => !!q.trapTag), 20), revealAtEnd: false });
+
+    $("btn-toggle-quiz-3d").onclick = () => {
+      quiz3dOn = !quiz3dOn;
+      localStorage.setItem("onetake_quiz_3d", quiz3dOn ? "on" : "off");
+      syncQuiz3DVisibility();
+    };
 
     $("btn-drill-mistakes-page").onclick = () => {
       const pool = getActiveMistakes().length ? getActiveMistakes() : getAllEverWrong();
@@ -1492,7 +1724,7 @@
     $("btn-quiz-exit").onclick = () => { showView("home"); renderHome(); };
     $("btn-prev-q").onclick = () => { if (session && session.index > 0) { session.index--; renderCurrentQuestion(); } };
     $("btn-next-q").onclick = () => { if (session && session.index < session.questions.length - 1) { session.index++; renderCurrentQuestion(); window.scrollTo({ top: 0, behavior: "smooth" }); } };
-    $("btn-submit-exam").onclick = finishSession;
+    $("btn-submit-exam").onclick = () => finishSession();
     $("btn-summary-home").onclick = () => { showView("home"); renderHome(); };
 
     document.addEventListener("keydown", (e) => {
@@ -1553,7 +1785,9 @@
       if (k === "A" || k === "1") handleOptionSelect("A");
       else if (k === "B" || k === "2") handleOptionSelect("B");
       else if (k === "C" || k === "3") handleOptionSelect("C");
-      else if (k === "ENTER" || k === "ARROWRIGHT") {
+      else if (k === "ARROWLEFT") {
+        if (!$("btn-prev-q").hidden) $("btn-prev-q").click();
+      } else if (k === "ENTER" || k === "ARROWRIGHT") {
         if (!$("btn-next-q").hidden) $("btn-next-q").click();
         else if (!$("btn-submit-exam").hidden) $("btn-submit-exam").click();
       }
