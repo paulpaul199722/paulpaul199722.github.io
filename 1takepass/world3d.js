@@ -270,52 +270,113 @@ export function createHongKongWorldProps({
       }
     });
 
-  // Helper: quick compact sedan mesh (used for oncoming, cross-traffic, parked, towed!)
+  // Shared lightweight radial glow sprite texture (zero heavy post-processing; 60fps mobile!)
+  const glowHaloTex = makeCanvasTexture(64, 64, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 2, w / 2, h / 2, w / 2);
+    g.addColorStop(0, "rgba(255,255,255,0.95)");
+    g.addColorStop(0.32, "rgba(255,255,255,0.45)");
+    g.addColorStop(0.7, "rgba(255,255,255,0.1)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  });
+  function makeGlowHalo(colorHex, size = 0.65, opacity = 0.72) {
+    const sp = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: glowHaloTex,
+        color: colorHex,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    );
+    sp.scale.set(size, size, 1);
+    return sp;
+  }
+
+  // Sleek beveled compact sedan profile (replaces boxy NPC rectangles across oncoming, cross-traffic, parked, towed!)
+  const compactSideShape = new THREE.Shape();
+  compactSideShape.moveTo(-1.02, 0.17);
+  compactSideShape.lineTo(1.02, 0.17);
+  compactSideShape.lineTo(1.02, 0.44);
+  compactSideShape.lineTo(0.84, 0.54);
+  compactSideShape.lineTo(0.46, 0.58);
+  compactSideShape.lineTo(0.24, 0.84);
+  compactSideShape.lineTo(-0.48, 0.84);
+  compactSideShape.lineTo(-0.74, 0.56);
+  compactSideShape.lineTo(-1.0, 0.5);
+  compactSideShape.closePath();
+  const compactBodyGeo = new THREE.ExtrudeGeometry(compactSideShape, {
+    depth: 0.92,
+    bevelEnabled: true,
+    bevelThickness: 0.05,
+    bevelSize: 0.04,
+    bevelSegments: 2
+  });
+  compactBodyGeo.translate(0, 0, -0.46);
+  compactBodyGeo.rotateY(Math.PI / 2); // now length runs along Z (-1..+1), width along X (-0.5..+0.5)
+
+  const compactGlassMat = new THREE.MeshPhysicalMaterial({
+    color: 0x182334,
+    roughness: 0.08,
+    metalness: 0.25,
+    clearcoat: 1.0
+  });
+
+  // Helper: sleek beveled compact sedan mesh (used for oncoming, cross-traffic, parked, towed!)
   function makeCompactCar(colorHex, { headlightsOn = false, highBeam = false } = {}) {
     const g = new THREE.Group();
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(1.0, 0.35, 2.0),
-      new THREE.MeshPhysicalMaterial({ color: colorHex, roughness: 0.28, metalness: 0.18, clearcoat: 0.75 })
-    );
-    body.position.y = 0.37;
+    const bodyMat = new THREE.MeshPhysicalMaterial({
+      color: colorHex,
+      roughness: 0.26,
+      metalness: 0.22,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.1
+    });
+    const body = new THREE.Mesh(compactBodyGeo, bodyMat);
     body.castShadow = true;
-    const cabin = new THREE.Mesh(
-      new THREE.BoxGeometry(0.86, 0.31, 1.0),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.16 })
-    );
-    cabin.position.set(0, 0.68, 0.05);
-    g.add(body, cabin);
+    body.receiveShadow = true;
+    const winWrap = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.24, 0.88), compactGlassMat);
+    winWrap.position.set(0, 0.69, 0.08);
+    const bumperR = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.12, 0.1), darkMetalMat);
+    bumperR.position.set(0, 0.22, 1.02);
+    g.add(body, winWrap, bumperR);
     addNpcWheels(g, 0.49, [-0.62, 0.62]);
     [-0.32, 0.32].forEach((tx) => {
-      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.09, 0.05), npcTailMat);
-      tl.position.set(tx, 0.41, 1.01);
+      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.05), npcTailMat);
+      tl.position.set(tx, 0.42, 1.03);
       g.add(tl);
     });
     if (headlightsOn) {
       [-0.32, 0.32].forEach((hx) => {
-        const hl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.05), headlightWhiteMat);
-        hl.position.set(hx, 0.41, -1.01);
-        g.add(hl);
+        const hl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 0.05), headlightWhiteMat);
+        hl.position.set(hx, 0.41, -1.03);
+        const halo = makeGlowHalo(0xfff5d6, 0.52, 0.55);
+        halo.position.set(hx, 0.41, -1.1);
+        g.add(hl, halo);
       });
     }
     let glareCones = null;
     if (highBeam) {
       glareCones = new THREE.Group();
       glareCones.visible = false;
-      const coneGeo = new THREE.ConeGeometry(0.68, 3.6, 14, 1, true);
+      const coneGeo = new THREE.ConeGeometry(0.72, 3.8, 14, 1, true);
       coneGeo.rotateX(Math.PI / 2);
       const coneMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
-        opacity: 0.36,
+        opacity: 0.38,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         side: THREE.DoubleSide
       });
       [-0.32, 0.32].forEach((hx) => {
         const c = new THREE.Mesh(coneGeo, coneMat);
-        c.position.set(hx, 0.38, -2.8);
-        glareCones.add(c);
+        c.position.set(hx, 0.38, -2.9);
+        const flare = makeGlowHalo(0xffffff, 1.25, 0.85);
+        flare.position.set(hx, 0.41, -1.12);
+        glareCones.add(c, flare);
       });
       g.add(glareCones);
     }
@@ -575,33 +636,42 @@ export function createHongKongWorldProps({
   speedCameraGroup.rotation.y = -0.22;
   scenarioRoot.add(speedCameraGroup);
 
-  // ==================== 12. HK POLICE ROADBLOCK / BREATHALYSER CHECKPOINT ====================
+  // ==================== 12. HK POLICE ROADBLOCK (Battenburg stripes + glowing roof lightbar!) ====================
+  const policeBattenburgTex = makeCanvasTexture(256, 32, (ctx, w, h) => {
+    const step = 32;
+    for (let x = 0; x < w; x += step) {
+      const even = (x / step) % 2 === 0;
+      ctx.fillStyle = even ? "#1d4ed8" : "#f8fafc";
+      ctx.fillRect(x, 0, step, h * 0.65);
+      ctx.fillStyle = even ? "#f8fafc" : "#1d4ed8";
+      ctx.fillRect(x, h * 0.65, step, h * 0.35);
+    }
+    ctx.fillStyle = "#dc2626";
+    ctx.fillRect(0, h - 5, w, 5);
+  });
   const policeBlockGroup = new THREE.Group();
   policeBlockGroup.visible = false;
   const polCar = new THREE.Group();
   const polBody = new THREE.Mesh(
-    new THREE.BoxGeometry(1.08, 0.42, 2.2),
-    new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.25, clearcoat: 0.85 })
+    compactBodyGeo,
+    new THREE.MeshPhysicalMaterial({ color: 0xf8fafc, roughness: 0.22, metalness: 0.14, clearcoat: 0.95 })
   );
-  polBody.position.y = 0.42;
+  polBody.scale.set(1.06, 1.06, 1.08);
   polBody.castShadow = true;
-  const polBlueStripe = new THREE.Mesh(
-    new THREE.BoxGeometry(1.1, 0.12, 2.22),
-    new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.35 })
+  const polStripeBand = new THREE.Mesh(
+    new THREE.BoxGeometry(1.09, 0.16, 2.15),
+    new THREE.MeshStandardMaterial({ map: policeBattenburgTex, roughness: 0.32 })
   );
-  polBlueStripe.position.y = 0.44;
-  const polRedStripe = new THREE.Mesh(
-    new THREE.BoxGeometry(1.11, 0.06, 2.23),
-    redPaintMat
-  );
-  polRedStripe.position.y = 0.35;
-  const polCabin = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.34, 1.15), darkMetalMat);
-  polCabin.position.set(0, 0.78, 0.05);
+  polStripeBand.position.y = 0.42;
+  const polWin = new THREE.Mesh(new THREE.BoxGeometry(0.99, 0.25, 0.95), compactGlassMat);
+  polWin.position.set(0, 0.72, 0.08);
   const polBlueMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x3b82f6, emissiveIntensity: 2.8 });
   const polRedMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, emissive: 0xef4444, emissiveIntensity: 2.8 });
-  const polBL = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.16), polRedMat); polBL.position.set(-0.2, 1.0, 0);
-  const polBR = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.16), polBlueMat); polBR.position.set(0.2, 1.0, 0);
-  polCar.add(polBody, polBlueStripe, polRedStripe, polCabin, polBL, polBR);
+  const polBL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.16), polRedMat); polBL.position.set(-0.2, 0.96, 0);
+  const polBR = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.16), polBlueMat); polBR.position.set(0.2, 0.96, 0);
+  const polHaloR = makeGlowHalo(0xef4444, 0.9, 0.85); polHaloR.position.set(-0.2, 1.0, 0);
+  const polHaloB = makeGlowHalo(0x3b82f6, 0.9, 0.85); polHaloB.position.set(0.2, 1.0, 0);
+  polCar.add(polBody, polStripeBand, polWin, polBL, polBR, polHaloR, polHaloB);
   addNpcWheels(polCar, 0.52, [-0.68, 0.68]);
   polCar.position.set(0.85, 0, -5.8);
   polCar.rotation.y = 0.42;
@@ -744,24 +814,120 @@ export function createHongKongWorldProps({
   }
   scenarioRoot.add(bollardGateGroup);
 
+  // Authentic HK Multi-Floor Residential/Commercial Towers with Window Grids, Podium Awnings & Glowing Shop Signs!
+  const makeBuildingFacadeTex = (wallHex, litSeed) =>
+    makeCanvasTexture(128, 256, (ctx, w, h) => {
+      ctx.fillStyle = wallHex;
+      ctx.fillRect(0, 0, w, h);
+      // Horizontal floor slab shadow lines
+      ctx.fillStyle = "rgba(15, 23, 42, 0.14)";
+      for (let y = 18; y < h - 32; y += 26) ctx.fillRect(0, y, w, 3);
+      // Glazed HK apartment window grid
+      for (let row = 0; row < 7; row++) {
+        for (let col = 0; col < 4; col++) {
+          const lit = ((row * 7 + col * 3 + litSeed) % 5) === 0;
+          ctx.fillStyle = lit ? "#fef08a" : "#334155";
+          ctx.fillRect(10 + col * 28, 24 + row * 26, 20, 15);
+          ctx.fillStyle = "rgba(255,255,255,0.22)";
+          ctx.fillRect(10 + col * 28, 24 + row * 26, 20, 3);
+        }
+      }
+      // Ground-floor shopfront podium
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(0, h - 38, w, 38);
+      ctx.fillStyle = "#fde68a";
+      ctx.fillRect(10, h - 28, w - 20, 20);
+    });
+
+  const makeBuildingEmissiveTex = (litSeed) =>
+    makeCanvasTexture(128, 256, (ctx, w, h) => {
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, w, h);
+      for (let row = 0; row < 7; row++) {
+        for (let col = 0; col < 4; col++) {
+          const lit = ((row * 7 + col * 3 + litSeed) % 3) === 0;
+          if (lit) {
+            ctx.fillStyle = (row + col) % 2 === 0 ? "#fde68a" : "#bfdbfe";
+            ctx.fillRect(10 + col * 28, 24 + row * 26, 20, 15);
+          }
+        }
+      }
+      ctx.fillStyle = "#fcd34d";
+      ctx.fillRect(10, h - 28, w - 20, 20);
+    });
+
   const cityBuildingsGroup = new THREE.Group();
   cityBuildingsGroup.visible = false;
-  const bldgColors = [0xdbeafe, 0xe2e8f0, 0xfef3c7, 0xcbd5e1, 0xd1fae5];
-  const winMat = new THREE.MeshStandardMaterial({ color: 0x334155, emissive: 0xfde68a, emissiveIntensity: 0.25, roughness: 0.3 });
+  const bldgWallPalette = ["#e2e8f0", "#f1ece1", "#dce8f2", "#e8e4da", "#d8e6df"];
+  const neonSignColors = [0x10b981, 0xef4444, 0xf59e0b, 0x3b82f6];
+  const cityBuildingMats = [];
+  const neonSignMats = [];
   for (let i = 0; i < 8; i++) {
     const side = i % 2 === 0 ? -1 : 1;
-    const h = 3.2 + (i % 3) * 1.45;
-    const z = -4.5 - Math.floor(i / 2) * 5.6;
-    const b = new THREE.Mesh(
-      new THREE.BoxGeometry(2.8, h, 3.6),
-      new THREE.MeshStandardMaterial({ color: bldgColors[i % bldgColors.length], roughness: 0.82 })
-    );
-    b.position.set(side * 6.8, h / 2, z);
-    const wBand = new THREE.Mesh(new THREE.BoxGeometry(2.84, h * 0.65, 2.8), winMat);
-    wBand.position.set(side * 6.8, h * 0.56, z);
-    cityBuildingsGroup.add(b, wBand);
+    const h = 4.2 + (i % 3) * 1.9;
+    const z = -4.2 - Math.floor(i / 2) * 5.4;
+    const facadeTex = makeBuildingFacadeTex(bldgWallPalette[i % bldgWallPalette.length], i + 1);
+    const emTex = makeBuildingEmissiveTex(i + 2);
+    const bMat = new THREE.MeshStandardMaterial({
+      map: facadeTex,
+      emissive: 0xffe4a0,
+      emissiveMap: emTex,
+      emissiveIntensity: 0.16,
+      roughness: 0.72
+    });
+    cityBuildingMats.push(bMat);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(3.0, h, 3.6), bMat);
+    b.position.set(side * 6.9, h / 2, z);
+    // Rooftop mechanical penthouse
+    const roofCap = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.55, 1.5), curbMat);
+    roofCap.position.set(side * 6.9, h + 0.27, z);
+    // Iconic HK overhanging shopfront neon/LED signboard!
+    const sCol = neonSignColors[i % neonSignColors.length];
+    const sMat = new THREE.MeshStandardMaterial({
+      color: sCol,
+      emissive: sCol,
+      emissiveIntensity: 0.45,
+      roughness: 0.3
+    });
+    neonSignMats.push(sMat);
+    const shopSign = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.38, 0.14), sMat);
+    shopSign.position.set(side * 4.95, 2.05 + (i % 2) * 0.45, z + 0.6);
+    cityBuildingsGroup.add(b, roofCap, shopSign);
   }
   scenarioRoot.add(cityBuildingsGroup);
+
+  // Permanent distant Hong Kong Lion Rock / Victoria Peak mountain silhouette + Victoria Harbour skyline ring!
+  const hkSkylineGroup = new THREE.Group();
+  const hillMat = new THREE.MeshStandardMaterial({ color: 0x3b6e5c, roughness: 0.95, metalness: 0.0 });
+  const hillSpecs = [
+    { x: -16, r: 9.5, h: 6.2, z: -31 },
+    { x: -5,  r: 8.0, h: 4.8, z: -32.5 },
+    { x: 6,   r: 9.0, h: 5.5, z: -32 },
+    { x: 17,  r: 10.2, h: 6.8, z: -30.5 }
+  ];
+  for (const hs of hillSpecs) {
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(hs.r, hs.h, 7), hillMat);
+    hill.position.set(hs.x, hs.h * 0.38, hs.z);
+    hill.scale.set(1.5, 1, 0.65);
+    hkSkylineGroup.add(hill);
+  }
+  const skylineTowerMat = new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    emissive: 0xfde68a,
+    emissiveMap: makeBuildingEmissiveTex(5),
+    emissiveIntensity: 0.14,
+    roughness: 0.78
+  });
+  for (let i = 0; i < 14; i++) {
+    const tx = -22 + i * 3.35 + ((i % 2) * 0.4);
+    if (Math.abs(tx) < 3.4) continue; // keep center expressway vanishing horizon wide open!
+    const th = 4.2 + ((i * 37) % 6) * 1.45;
+    const tw = 1.6 + (i % 3) * 0.45;
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(tw, th, 1.8), skylineTowerMat);
+    tower.position.set(tx, th / 2 - 0.1, -26.8 - (i % 3) * 1.4);
+    hkSkylineGroup.add(tower);
+  }
+  scenarioRoot.add(hkSkylineGroup);
 
   // ==================== 16. AUTHENTIC HK ROAD USERS: MOTORCYCLE, TAXI, LORRY, PARKED ROW, ANIMAL ====================
   const motorcycleGroup = new THREE.Group();
@@ -785,30 +951,44 @@ export function createHongKongWorldProps({
   motorcycleGroup.position.set(-0.62, 0, -4.6); // authentic HK right-of-left-lane motorcycle position!
   scenarioRoot.add(motorcycleGroup);
 
+  const taxiSignTex = makeCanvasTexture(128, 48, (ctx, w, h) => {
+    ctx.fillStyle = "#fffbeb";
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = "#dc2626";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(3, 3, w - 6, h - 6);
+    ctx.fillStyle = "#b91c1c";
+    ctx.font = "900 28px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("TAXI", w / 2, h / 2 + 1);
+  });
   const taxiGroup = new THREE.Group();
   taxiGroup.visible = false;
   const txLower = new THREE.Mesh(
-    new THREE.BoxGeometry(1.04, 0.36, 2.15),
-    new THREE.MeshPhysicalMaterial({ color: 0xdc2626, roughness: 0.25, clearcoat: 0.85 })
+    compactBodyGeo,
+    new THREE.MeshPhysicalMaterial({ color: 0xdc2626, roughness: 0.22, metalness: 0.2, clearcoat: 0.95 })
   );
-  txLower.position.y = 0.38;
+  txLower.scale.set(1.04, 1.0, 1.06);
   txLower.castShadow = true;
-  const txRoof = new THREE.Mesh(
-    new THREE.BoxGeometry(0.92, 0.32, 1.1),
-    new THREE.MeshPhysicalMaterial({ color: 0xe2e8f0, roughness: 0.28, metalness: 0.35 })
+  const txWin = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.23, 0.94), compactGlassMat);
+  txWin.position.set(0, 0.69, 0.08);
+  const txRoofCap = new THREE.Mesh(
+    new THREE.BoxGeometry(0.94, 0.08, 0.92),
+    new THREE.MeshPhysicalMaterial({ color: 0xe2e8f0, roughness: 0.24, metalness: 0.45, clearcoat: 0.85 })
   );
-  txRoof.position.set(0, 0.7, 0.05);
+  txRoofCap.position.set(0, 0.86, 0.06);
   const txSign = new THREE.Mesh(
-    new THREE.BoxGeometry(0.34, 0.11, 0.14),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfffbeb, emissiveIntensity: 2.0 })
+    new THREE.BoxGeometry(0.38, 0.13, 0.14),
+    new THREE.MeshStandardMaterial({ map: taxiSignTex, emissive: 0xfffbeb, emissiveIntensity: 1.4 })
   );
-  txSign.position.set(0, 0.92, 0.02);
+  txSign.position.set(0, 0.97, 0.04);
   [-0.34, 0.34].forEach((tx) => {
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.09, 0.05), npcTailMat);
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.05), npcTailMat);
     tl.position.set(tx, 0.42, 1.09);
     taxiGroup.add(tl);
   });
-  taxiGroup.add(txLower, txRoof, txSign);
+  taxiGroup.add(txLower, txWin, txRoofCap, txSign);
   addNpcWheels(taxiGroup, 0.51, [-0.66, 0.66]);
   taxiGroup.position.set(-1.05, 0, -4.8);
   scenarioRoot.add(taxiGroup);
@@ -1062,34 +1242,47 @@ export function createHongKongWorldProps({
   }
   scenarioRoot.add(threeWhiteLinesGroup);
 
-  // E. Iconic HK Green Double-Decker Tram ("Ding Ding") + Yellow Stop Line (q121, q277, q280!)
+  // E. Iconic HK Green Double-Decker Tram ("Ding Ding") + Double Window Decks + Diamond Pantograph + Yellow Stop Line!
   const hkTramGroup = new THREE.Group();
   hkTramGroup.visible = false;
   const tramLower = new THREE.Mesh(
-    new THREE.BoxGeometry(1.12, 1.88, 3.85),
-    new THREE.MeshPhysicalMaterial({ color: 0x047857, roughness: 0.3, clearcoat: 0.75 })
+    new THREE.BoxGeometry(1.14, 1.92, 3.88),
+    new THREE.MeshPhysicalMaterial({ color: 0x047857, roughness: 0.26, metalness: 0.12, clearcoat: 0.85 })
   );
-  tramLower.position.y = 1.06;
+  tramLower.position.y = 1.08;
   tramLower.castShadow = true;
   const tramCream = new THREE.Mesh(
-    new THREE.BoxGeometry(1.14, 0.28, 3.87),
-    new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.4 })
+    new THREE.BoxGeometry(1.16, 0.26, 3.9),
+    new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.38 })
   );
-  tramCream.position.y = 1.02;
-  const tramWinTop = new THREE.Mesh(
-    new THREE.BoxGeometry(1.135, 0.44, 3.45),
-    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.15 })
-  );
+  tramCream.position.y = 1.06;
+  const tramGlassMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    emissive: 0xfde68a,
+    emissiveIntensity: 0.32,
+    roughness: 0.12
+  });
+  const tramWinTop = new THREE.Mesh(new THREE.BoxGeometry(1.155, 0.42, 3.55), tramGlassMat);
   tramWinTop.position.y = 1.62;
-  const tramPanto = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 6), darkMetalMat);
-  tramPanto.position.set(0, 2.3, 0);
-  tramPanto.rotation.x = 0.25;
+  const tramWinBot = new THREE.Mesh(new THREE.BoxGeometry(1.155, 0.34, 3.35), tramGlassMat);
+  tramWinBot.position.y = 0.68;
+  const tramRoofCap = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.08, 3.8), curbMat);
+  tramRoofCap.position.y = 2.06;
+  // Classic diamond double-arm pantograph
+  const pantoArmA = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.68, 6), darkMetalMat);
+  pantoArmA.position.set(0, 2.34, -0.14);
+  pantoArmA.rotation.x = 0.4;
+  const pantoArmB = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.68, 6), darkMetalMat);
+  pantoArmB.position.set(0, 2.34, 0.14);
+  pantoArmB.rotation.x = -0.4;
+  const pantoBar = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.03, 0.04), darkMetalMat);
+  pantoBar.position.set(0, 2.66, 0);
   [-0.35, 0.35].forEach((tx) => {
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.05), npcTailMat);
-    tl.position.set(tx, 0.46, 1.94);
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.05), npcTailMat);
+    tl.position.set(tx, 0.42, 1.96);
     hkTramGroup.add(tl);
   });
-  hkTramGroup.add(tramLower, tramCream, tramWinTop, tramPanto);
+  hkTramGroup.add(tramLower, tramCream, tramWinTop, tramWinBot, tramRoofCap, pantoArmA, pantoArmB, pantoBar);
   hkTramGroup.position.set(0.0, 0, -6.0);
   scenarioRoot.add(hkTramGroup);
 
@@ -1127,6 +1320,7 @@ export function createHongKongWorldProps({
     emissiveIntensity: 2.0,
     roughness: 0.2
   });
+  const gmHalos = [];
   [-2.82, 2.82].forEach((gx) => {
     const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.15, 10), darkMetalMat);
     p.position.set(gx, 1.08, -3.15);
@@ -1134,7 +1328,10 @@ export function createHongKongWorldProps({
     box.position.set(gx, 1.98, -3.15);
     const face = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.28), gmFaceMat);
     face.position.set(gx, 1.86, -3.02);
-    greenManGroup.add(p, box, face);
+    const gmHalo = makeGlowHalo(0x10b981, 0.56, 0.65);
+    gmHalo.position.set(gx, 1.86, -2.98);
+    gmHalos.push(gmHalo);
+    greenManGroup.add(p, box, face, gmHalo);
   });
   // White pedestrian stud bars on road (not zebra stripes!)
   for (let i = 0; i < 6; i++) {
@@ -1214,7 +1411,17 @@ export function createHongKongWorldProps({
   }
 
   // ==================== PER-FRAME ANIMATION (ZERO ALLOCATIONS) ====================
-  function animate(dt, elapsed, { roadSpeed, roadOffset = 0, greenManFlash = false }) {
+  function animate(dt, elapsed, { roadSpeed, roadOffset = 0, greenManFlash = false, isNight = false }) {
+    if (hkSkylineGroup.visible) {
+      skylineTowerMat.emissiveIntensity = isNight ? 0.85 : 0.1;
+      hillMat.color.setHex(isNight ? 0x10232b : 0x3b6e5c);
+    }
+    if (cityBuildingsGroup.visible) {
+      const bEm = isNight ? 0.82 : 0.14;
+      for (const m of cityBuildingMats) m.emissiveIntensity = bEm;
+      const nEm = isNight ? 1.55 : 0.35;
+      for (const m of neonSignMats) m.emissiveIntensity = nEm;
+    }
     if (oncomingCarGroup.visible) {
       // Oncoming vehicle approaches toward +Z (relative speed = our roadSpeed + oncoming speed)
       const rel = Math.max(3.5, Math.abs(roadSpeed) + 3.8);
@@ -1235,6 +1442,8 @@ export function createHongKongWorldProps({
       const alt = Math.floor(elapsed * 6.5) % 2 === 0;
       polRedMat.emissiveIntensity = alt ? 3.2 : 0.2;
       polBlueMat.emissiveIntensity = alt ? 0.2 : 3.2;
+      polHaloR.material.opacity = alt ? 0.88 : 0.08;
+      polHaloB.material.opacity = alt ? 0.08 : 0.88;
     }
     if (speedCameraGroup.visible) {
       const flash = (elapsed % 2.4) < 0.14;
@@ -1275,7 +1484,9 @@ export function createHongKongWorldProps({
       threeWhiteLinesGroup.position.z = ((roadOffset % 2.2) + 2.2) % 2.2;
     }
     if (greenManGroup.visible) {
-      gmFaceMat.emissiveIntensity = greenManFlash ? (Math.floor(elapsed * 3.0) % 2 === 0 ? 2.4 : 0.15) : 2.0;
+      const gmOn = !greenManFlash || Math.floor(elapsed * 3.0) % 2 === 0;
+      gmFaceMat.emissiveIntensity = gmOn ? 2.4 : 0.15;
+      for (const h of gmHalos) h.material.opacity = gmOn ? 0.68 : 0.04;
     }
   }
 
@@ -1321,6 +1532,7 @@ export function createHongKongWorldProps({
       hospitalGroup,
       bollardGateGroup,
       cityBuildingsGroup,
+      hkSkylineGroup,
       motorcycleGroup,
       taxiGroup,
       lorryGroup,

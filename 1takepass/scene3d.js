@@ -50,10 +50,70 @@ import { createHongKongWorldProps } from "./world3d.js";
   viewport.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const bgColor = new THREE.Color(isDarkTheme() ? 0x0f1724 : 0xeaf3fb);
+  const bgColor = new THREE.Color(isDarkTheme() ? 0x0f1724 : 0xdbeeff);
   scene.background = bgColor;
-  const fog = new THREE.Fog(bgColor.getHex(), 14, 34);
+  const fog = new THREE.Fog(bgColor.getHex(), 15, 36);
   scene.fog = fog;
+
+  // Lightweight GLSL Procedural Sky Dome (day azure + sun halo / rain storm clouds / starry HK night!)
+  const skyUniforms = {
+    uTopColor: { value: new THREE.Color(isDarkTheme() ? 0x060b18 : 0x5ca4e6) },
+    uHorizonColor: { value: new THREE.Color(isDarkTheme() ? 0x16243d : 0xdbeeff) },
+    uGroundColor: { value: new THREE.Color(isDarkTheme() ? 0x0c1622 : 0x89a89a) },
+    uSunDir: { value: new THREE.Vector3(0.32, 0.36, -0.88).normalize() },
+    uSunIntensity: { value: isDarkTheme() ? 0.0 : 1.0 },
+    uStarIntensity: { value: isDarkTheme() ? 0.85 : 0.0 }
+  };
+  const skyDome = new THREE.Mesh(
+    new THREE.SphereGeometry(62, 24, 14),
+    new THREE.ShaderMaterial({
+      uniforms: skyUniforms,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      vertexShader: `
+        varying vec3 vWorldDir;
+        void main() {
+          vWorldDir = normalize(position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uTopColor;
+        uniform vec3 uHorizonColor;
+        uniform vec3 uGroundColor;
+        uniform vec3 uSunDir;
+        uniform float uSunIntensity;
+        uniform float uStarIntensity;
+        varying vec3 vWorldDir;
+        float hash21(vec2 p) {
+          p = fract(p * vec2(123.34, 456.21));
+          p += dot(p, p + 45.32);
+          return fract(p.x * p.y);
+        }
+        void main() {
+          vec3 dir = normalize(vWorldDir);
+          float h = dir.y;
+          vec3 col = h >= 0.0
+            ? mix(uHorizonColor, uTopColor, pow(clamp(h, 0.0, 1.0), 0.58))
+            : mix(uHorizonColor, uGroundColor, clamp(-h * 3.5, 0.0, 1.0));
+          if (uSunIntensity > 0.01 && h > -0.05) {
+            float sunDot = max(dot(dir, uSunDir), 0.0);
+            col += vec3(1.0, 0.94, 0.78) * (pow(sunDot, 16.0) * 0.24 + pow(sunDot, 140.0) * 0.72) * uSunIntensity;
+          }
+          if (uStarIntensity > 0.01 && h > 0.12) {
+            vec2 grid = floor(dir.xz / (dir.y + 0.15) * 42.0);
+            float rnd = hash21(grid);
+            if (rnd > 0.986) {
+              col += vec3(0.85, 0.92, 1.0) * smoothstep(0.12, 0.35, h) * uStarIntensity * 0.7;
+            }
+          }
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `
+    })
+  );
+  scene.add(skyDome);
 
   // Studio environment reflections via PMREM + RoomEnvironment (threejs-lighting)
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -261,24 +321,164 @@ import { createHongKongWorldProps } from "./world3d.js";
   const textureLoader = new THREE.TextureLoader();
   const signTexCache = new Map();
 
+  // Shared lightweight radial glow sprite helper (zero heavy post-processing; silky 60fps on mobile!)
+  const glowHaloTex = makeCanvasTexture(64, 64, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 2, w / 2, h / 2, w / 2);
+    g.addColorStop(0, "rgba(255,255,255,0.96)");
+    g.addColorStop(0.32, "rgba(255,255,255,0.44)");
+    g.addColorStop(0.7, "rgba(255,255,255,0.1)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  });
+  function makeGlowHalo(colorHex, size = 0.6, opacity = 0.72) {
+    const sp = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: glowHaloTex,
+        color: colorHex,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    );
+    sp.scale.set(size, size, 1);
+    return sp;
+  }
+
+  // ==================== PROCEDURAL PBR ROAD, SIDEWALK, KERB & GRASS TEXTURES ====================
+  const makeRepeatingTex = (w, h, drawFn, { isColor = true, repeatX = 1, repeatY = 10 } = {}) => {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d");
+    drawFn(ctx, w, h);
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeatX, repeatY);
+    if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+    return tex;
+  };
+
+  // Asphalt color map: rich dark Hong Kong tarmac aggregate + subtle twin wheel wear tracks
+  const asphaltColorTex = makeRepeatingTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = "#363e4b";
+    ctx.fillRect(0, 0, w, h);
+    // Subtle darker twin tire wear lanes (left lane x~26%, right lane x~74%)
+    const drawTrack = (cx) => {
+      const g = ctx.createLinearGradient(cx - 28, 0, cx + 28, 0);
+      g.addColorStop(0, "rgba(18,22,30,0)");
+      g.addColorStop(0.5, "rgba(18,22,30,0.22)");
+      g.addColorStop(1, "rgba(18,22,30,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - 28, 0, 56, h);
+    };
+    drawTrack(w * 0.27);
+    drawTrack(w * 0.73);
+    // Aggregate asphalt stone speckles (deterministic pseudo-random — zero flicker)
+    let seed = 1337;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    for (let i = 0; i < 2400; i++) {
+      const x = rand() * w;
+      const y = rand() * h;
+      const v = rand() > 0.5 ? 76 : 36;
+      ctx.fillStyle = `rgba(${v},${v + 5},${v + 12},0.35)`;
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }, { isColor: true, repeatX: 1, repeatY: 11 });
+
+  // Asphalt roughness map (LINEAR scalar — smooth specular patches shine realistically in rain!)
+  const asphaltRoughTex = makeRepeatingTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = "rgb(218,218,218)";
+    ctx.fillRect(0, 0, w, h);
+    // Slightly smoother tire tracks
+    ctx.fillStyle = "rgb(172,172,172)";
+    ctx.fillRect(w * 0.21, 0, 34, h);
+    ctx.fillRect(w * 0.67, 0, 34, h);
+    // Organic micro-puddle patches (glossy when wet!)
+    let seed = 4242;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    for (let i = 0; i < 24; i++) {
+      const px = rand() * w;
+      const py = rand() * h;
+      const pr = 12 + rand() * 24;
+      const g = ctx.createRadialGradient(px, py, 2, px, py, pr);
+      g.addColorStop(0, "rgba(75,75,75,0.7)");
+      g.addColorStop(1, "rgba(218,218,218,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+    }
+  }, { isColor: false, repeatX: 1, repeatY: 11 });
+
+  // Hong Kong grey concrete paving tiles for pedestrian sidewalks
+  const pavementTex = makeRepeatingTex(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = "#b8c1cc";
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = "rgba(51,65,85,0.28)";
+    ctx.lineWidth = 2;
+    for (let y = 0; y < h; y += 32) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      const off = (y / 32) % 2 === 0 ? 0 : 16;
+      for (let x = off; x < w; x += 32) {
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 32); ctx.stroke();
+      }
+    }
+  }, { isColor: true, repeatX: 2, repeatY: 22 });
+
+  // Hong Kong segmented concrete kerb texture
+  const curbTex = makeRepeatingTex(64, 128, (ctx, w, h) => {
+    ctx.fillStyle = "#d5dce4";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(0, 0, w, 4);
+    ctx.fillRect(0, h / 2, w, 4);
+    ctx.fillStyle = "rgba(30,41,59,0.14)";
+    ctx.fillRect(0, 0, 8, h);
+  }, { isColor: true, repeatX: 1, repeatY: 22 });
+
+  // Natural mottled HK tropical meadow verge (never flat solid neon green!)
+  const vergeTex = makeRepeatingTex(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = "#488f68";
+    ctx.fillRect(0, 0, w, h);
+    let seed = 9001;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    for (let i = 0; i < 650; i++) {
+      ctx.fillStyle = rand() > 0.5 ? "rgba(32,96,62,0.26)" : "rgba(116,178,136,0.22)";
+      ctx.fillRect(rand() * w, rand() * h, 4, 6);
+    }
+  }, { isColor: true, repeatX: 6, repeatY: 14 });
+
   // ==================== SHARED MATERIALS ====================
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x353c48, roughness: 0.9, metalness: 0.04 });
-  const vergeMat = new THREE.MeshStandardMaterial({ color: 0x3d8b63, roughness: 0.95 });
-  const curbMat = new THREE.MeshStandardMaterial({ color: 0xcbd2da, roughness: 0.78 });
-  const dashMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5 });
-  const edgeLineMat = new THREE.MeshStandardMaterial({ color: 0xf4f6f9, roughness: 0.55 });
-  const doubleYellowMat = new THREE.MeshStandardMaterial({ color: 0xf5b700, roughness: 0.5 });
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0x9aa5b4, roughness: 0.45, metalness: 0.55 });
-  const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x1e2530, roughness: 0.55, metalness: 0.4 });
+  const roadMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: asphaltColorTex,
+    roughnessMap: asphaltRoughTex,
+    bumpMap: asphaltRoughTex,
+    bumpScale: 0.015,
+    roughness: 0.92,
+    metalness: 0.05
+  });
+  const sidewalkMat = new THREE.MeshStandardMaterial({ map: pavementTex, roughness: 0.85, metalness: 0.04 });
+  const vergeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: vergeTex, roughness: 0.95 });
+  const curbMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: curbTex, roughness: 0.74 });
+  const dashMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.48 });
+  const edgeLineMat = new THREE.MeshStandardMaterial({ color: 0xf4f6f9, roughness: 0.52 });
+  const doubleYellowMat = new THREE.MeshStandardMaterial({ color: 0xf5b700, roughness: 0.48 });
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x9aa5b4, roughness: 0.4, metalness: 0.6 });
+  const hkRailMat = new THREE.MeshStandardMaterial({ color: 0xb0bac6, roughness: 0.38, metalness: 0.65 });
+  const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x1e2530, roughness: 0.5, metalness: 0.45 });
   const lampHeadMat = new THREE.MeshStandardMaterial({
     color: 0xfff3d1,
     emissive: 0xffd580,
     emissiveIntensity: 0.35,
     roughness: 0.25
   });
-  const coneOrangeMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.55 });
-  const coneStripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-  const treeFoliageMat = new THREE.MeshStandardMaterial({ color: 0x1e6f4a, roughness: 0.85 });
+  const coneOrangeMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.52 });
+  const coneStripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38 });
+  const treeFoliageMat = new THREE.MeshStandardMaterial({ color: 0x1f734b, roughness: 0.84 });
+  const treeFoliageLightMat = new THREE.MeshStandardMaterial({ color: 0x2f8f5f, roughness: 0.8 });
   const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4f3a, roughness: 0.9 });
 
   // Authentic HK Road Users' Code p.62 cat's-eye studs
@@ -286,7 +486,7 @@ import { createHongKongWorldProps } from "./world3d.js";
   const studWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, emissive: 0xffffff, emissiveIntensity: 0.25, roughness: 0.3 });
   const studAmberMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.25, roughness: 0.3 });
 
-  // ==================== ROAD & EXPRESSWAY ====================
+  // ==================== ROAD, HK SIDEWALKS & EXPRESSWAY ====================
   const roadWidth = 4.6;
   const roadLen = 46;
 
@@ -297,6 +497,20 @@ import { createHongKongWorldProps } from "./world3d.js";
   roadMesh.matrixAutoUpdate = false;
   roadMesh.updateMatrix();
   worldPivot.add(roadMesh);
+
+  // Authentic HK Tiled Sidewalk Strips along both curbs!
+  const sidewalkGeo = new THREE.PlaneGeometry(2.1, roadLen);
+  const leftSidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
+  leftSidewalk.rotation.x = -Math.PI / 2;
+  leftSidewalk.position.set(-roadWidth / 2 - 1.32, 0.04, -8);
+  leftSidewalk.receiveShadow = true;
+  worldPivot.add(leftSidewalk);
+
+  const rightSidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
+  rightSidewalk.rotation.x = -Math.PI / 2;
+  rightSidewalk.position.set(roadWidth / 2 + 1.32, 0.04, -8);
+  rightSidewalk.receiveShadow = true;
+  worldPivot.add(rightSidewalk);
 
   const vergeGeo = new THREE.PlaneGeometry(24, roadLen);
   const leftVerge = new THREE.Mesh(vergeGeo, vergeMat);
@@ -330,7 +544,7 @@ import { createHongKongWorldProps } from "./world3d.js";
   [-roadWidth / 2 + 0.22, roadWidth / 2 - 0.22].forEach((lx) => {
     const line = new THREE.Mesh(edgeLineGeo, edgeLineMat);
     line.rotation.x = -Math.PI / 2;
-    line.position.set(lx, 0.005, -8);
+    line.position.set(lx, 0.006, -8);
     line.matrixAutoUpdate = false;
     line.updateMatrix();
     worldPivot.add(line);
@@ -339,12 +553,12 @@ import { createHongKongWorldProps } from "./world3d.js";
   // Curb yellow lines (prominently emphasized in parking/no-stopping scenarios!)
   const curbYellow1 = new THREE.Mesh(new THREE.PlaneGeometry(0.08, roadLen), doubleYellowMat);
   curbYellow1.rotation.x = -Math.PI / 2;
-  curbYellow1.position.set(-roadWidth / 2 + 0.07, 0.007, -8);
+  curbYellow1.position.set(-roadWidth / 2 + 0.07, 0.008, -8);
   worldPivot.add(curbYellow1);
 
   const curbYellow2 = new THREE.Mesh(new THREE.PlaneGeometry(0.08, roadLen), doubleYellowMat);
   curbYellow2.rotation.x = -Math.PI / 2;
-  curbYellow2.position.set(-roadWidth / 2 + 0.2, 0.007, -8);
+  curbYellow2.position.set(-roadWidth / 2 + 0.2, 0.008, -8);
   curbYellow2.visible = false;
   worldPivot.add(curbYellow2);
 
@@ -366,47 +580,79 @@ import { createHongKongWorldProps } from "./world3d.js";
     worldPivot.add(m);
   });
 
-  // Scrolling roadside street lamps + safety cones + trees
+  // Authentic Iconic Hong Kong Grey Galvanized Pedestrian Guardrails (InstancedMesh — 0 GC, 2 draw calls!)
+  const RAIL_COUNT = 16;
+  const RAIL_STEP = 2.4;
+  const railPostGeo = new THREE.BoxGeometry(0.04, 0.68, 0.04);
+  const railBarGeo = new THREE.BoxGeometry(0.035, 0.045, 2.35);
+  const railPostInstL = new THREE.InstancedMesh(railPostGeo, hkRailMat, RAIL_COUNT);
+  const railPostInstR = new THREE.InstancedMesh(railPostGeo, hkRailMat, RAIL_COUNT);
+  const railTopBarL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.045, roadLen), hkRailMat);
+  railTopBarL.position.set(-roadWidth / 2 - 0.34, 0.68, -8);
+  const railMidBarL = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, roadLen), hkRailMat);
+  railMidBarL.position.set(-roadWidth / 2 - 0.34, 0.34, -8);
+  const railTopBarR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.045, roadLen), hkRailMat);
+  railTopBarR.position.set(roadWidth / 2 + 0.34, 0.68, -8);
+  const railMidBarR = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, roadLen), hkRailMat);
+  railMidBarR.position.set(roadWidth / 2 + 0.34, 0.34, -8);
+  const hkRailLeftGroup = new THREE.Group();
+  hkRailLeftGroup.add(railPostInstL, railTopBarL, railMidBarL);
+  const hkRailRightGroup = new THREE.Group();
+  hkRailRightGroup.add(railPostInstR, railTopBarR, railMidBarR);
+  railPostInstL.frustumCulled = false;
+  railPostInstR.frustumCulled = false;
+  worldPivot.add(hkRailLeftGroup, hkRailRightGroup);
+
+  // Scrolling roadside street lamps + glowing night halos + multi-layered lush HK trees
   const PROP_COUNT = 6;
   const PROP_SPAN = 36;
   const roadsideProps = [];
-  const poleGeo = new THREE.CylinderGeometry(0.045, 0.06, 2.7, 8);
+  const streetLampHalos = [];
+  const poleGeo = new THREE.CylinderGeometry(0.045, 0.06, 2.75, 8);
   const armGeo = new THREE.BoxGeometry(0.95, 0.05, 0.05);
-  const bulbGeo = new THREE.BoxGeometry(0.24, 0.06, 0.12);
+  const bulbGeo = new THREE.BoxGeometry(0.26, 0.06, 0.13);
   const coneBaseGeo = new THREE.BoxGeometry(0.24, 0.04, 0.24);
   const coneBodyGeo = new THREE.ConeGeometry(0.1, 0.34, 12);
   const coneBandGeo = new THREE.CylinderGeometry(0.052, 0.072, 0.09, 12);
-  const treeConeGeo = new THREE.ConeGeometry(0.55, 1.35, 7);
-  const treeTrunkGeo = new THREE.CylinderGeometry(0.1, 0.13, 0.45, 7);
+  const treeCanopyA = new THREE.IcosahedronGeometry(0.56, 1);
+  const treeCanopyB = new THREE.IcosahedronGeometry(0.42, 1);
+  const treeTrunkGeo = new THREE.CylinderGeometry(0.085, 0.13, 0.72, 7);
 
   for (let i = 0; i < PROP_COUNT; i++) {
     const pair = new THREE.Group();
     const zBase = -i * (PROP_SPAN / PROP_COUNT) + 4;
 
     const lampL = new THREE.Group();
-    const pL = new THREE.Mesh(poleGeo, poleMat); pL.position.y = 1.35; pL.castShadow = true;
-    const aL = new THREE.Mesh(armGeo, poleMat); aL.position.set(0.45, 2.66, 0);
-    const bL = new THREE.Mesh(bulbGeo, lampHeadMat); bL.position.set(0.84, 2.62, 0);
-    lampL.add(pL, aL, bL);
-    // Placed slightly further out on verge so roadside signs & traffic lights ALWAYS stand cleanly in front!
-    lampL.position.set(-roadWidth / 2 - 1.05, 0, 0);
+    const pL = new THREE.Mesh(poleGeo, poleMat); pL.position.y = 1.37; pL.castShadow = true;
+    const aL = new THREE.Mesh(armGeo, poleMat); aL.position.set(0.45, 2.7, 0);
+    const bL = new THREE.Mesh(bulbGeo, lampHeadMat); bL.position.set(0.84, 2.66, 0);
+    const hL = makeGlowHalo(0xffd580, 1.05, 0.0); hL.position.set(0.84, 2.62, 0);
+    streetLampHalos.push(hL);
+    lampL.add(pL, aL, bL, hL);
+    // Placed slightly further out on pavement so roadside signs & traffic lights ALWAYS stand cleanly in front!
+    lampL.position.set(-roadWidth / 2 - 1.12, 0, 0);
     pair.add(lampL);
 
     const lampR = new THREE.Group();
-    const pR = new THREE.Mesh(poleGeo, poleMat); pR.position.y = 1.35; pR.castShadow = true;
-    const aR = new THREE.Mesh(armGeo, poleMat); aR.position.set(-0.45, 2.66, 0);
-    const bR = new THREE.Mesh(bulbGeo, lampHeadMat); bR.position.set(-0.84, 2.62, 0);
-    lampR.add(pR, aR, bR);
-    lampR.position.set(roadWidth / 2 + 1.05, 0, -2.5);
+    const pR = new THREE.Mesh(poleGeo, poleMat); pR.position.y = 1.37; pR.castShadow = true;
+    const aR = new THREE.Mesh(armGeo, poleMat); aR.position.set(-0.45, 2.7, 0);
+    const bR = new THREE.Mesh(bulbGeo, lampHeadMat); bR.position.set(-0.84, 2.66, 0);
+    const hR = makeGlowHalo(0xffd580, 1.05, 0.0); hR.position.set(-0.84, 2.62, 0);
+    streetLampHalos.push(hR);
+    lampR.add(pR, aR, bR, hR);
+    lampR.position.set(roadWidth / 2 + 1.12, 0, -2.5);
     pair.add(lampR);
 
+    // Multi-layered lush HK tropical roadside tree (3-puff organic canopy — no toy cones!)
     const tree = new THREE.Group();
-    const trunk = new THREE.Mesh(treeTrunkGeo, treeTrunkMat); trunk.position.y = 0.22;
-    const foliage = new THREE.Mesh(treeConeGeo, treeFoliageMat); foliage.position.y = 1.05; foliage.castShadow = true;
-    tree.add(trunk, foliage);
+    const trunk = new THREE.Mesh(treeTrunkGeo, treeTrunkMat); trunk.position.y = 0.36; trunk.castShadow = true;
+    const cMain = new THREE.Mesh(treeCanopyA, treeFoliageMat); cMain.position.set(0, 1.08, 0); cMain.castShadow = true;
+    const cSub1 = new THREE.Mesh(treeCanopyB, treeFoliageLightMat); cSub1.position.set(0.28, 1.32, 0.14);
+    const cSub2 = new THREE.Mesh(treeCanopyB, treeFoliageMat); cSub2.position.set(-0.26, 0.98, -0.18);
+    tree.add(trunk, cMain, cSub1, cSub2);
     const side = i % 2 === 0 ? -1 : 1;
-    tree.position.set(side * (roadWidth / 2 + 1.85 + (i % 3) * 0.45), 0, -1.2);
-    tree.scale.setScalar(0.85 + (i % 3) * 0.14);
+    tree.position.set(side * (roadWidth / 2 + 2.15 + (i % 3) * 0.45), 0, -1.2);
+    tree.scale.setScalar(0.86 + (i % 3) * 0.15);
     pair.add(tree);
 
     pair.position.z = zBase;
@@ -474,6 +720,9 @@ import { createHongKongWorldProps } from "./world3d.js";
   const tlRed = new THREE.Mesh(tlLensGeo, tlRedMat); tlRed.position.set(0, 2.31, 0.15);
   const tlAmber = new THREE.Mesh(tlLensGeo, tlAmberMat); tlAmber.position.set(0, 2.02, 0.15);
   const tlGreen = new THREE.Mesh(tlLensGeo, tlGreenMat); tlGreen.position.set(0, 1.73, 0.15);
+  const tlHaloRed = makeGlowHalo(0xef4444, 0.65, 0.0); tlHaloRed.position.set(0, 2.31, 0.2);
+  const tlHaloAmber = makeGlowHalo(0xf59e0b, 0.65, 0.0); tlHaloAmber.position.set(0, 2.02, 0.2);
+  const tlHaloGreen = makeGlowHalo(0x10b981, 0.65, 0.0); tlHaloGreen.position.set(0, 1.73, 0.2);
 
   const tlArrowBox = new THREE.Group();
   tlArrowBox.visible = false;
@@ -484,7 +733,8 @@ import { createHongKongWorldProps } from "./world3d.js";
   });
   const arrowFace = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.28), arrowFaceMat);
   arrowFace.position.set(-0.37, 1.73, 0.125);
-  tlArrowBox.add(arrowHousing, arrowFace);
+  const tlArrowHalo = makeGlowHalo(0x10b981, 0.56, 0.65); tlArrowHalo.position.set(-0.37, 1.73, 0.17);
+  tlArrowBox.add(arrowHousing, arrowFace, tlArrowHalo);
 
   // Twin wigwag alternating red warning lights (fire station exit)
   const wigwagBox = new THREE.Group();
@@ -495,9 +745,11 @@ import { createHongKongWorldProps } from "./world3d.js";
   const wwRightMat = new THREE.MeshStandardMaterial({ color: 0x450a0a, emissive: 0xef4444, emissiveIntensity: 0.1, roughness: 0.2 });
   const wwL = new THREE.Mesh(tlLensGeo, wwLeftMat); wwL.position.set(-0.06, 1.95, 0.12);
   const wwR = new THREE.Mesh(tlLensGeo, wwRightMat); wwR.position.set(0.3, 1.95, 0.12);
-  wigwagBox.add(wwHousing, wwL, wwR);
+  const wwHaloL = makeGlowHalo(0xef4444, 0.65, 0.0); wwHaloL.position.set(-0.06, 1.95, 0.18);
+  const wwHaloR = makeGlowHalo(0xef4444, 0.65, 0.0); wwHaloR.position.set(0.3, 1.95, 0.18);
+  wigwagBox.add(wwHousing, wwL, wwR, wwHaloL, wwHaloR);
 
-  tlAssembly.add(tlPost, tlHead, tlRed, tlAmber, tlGreen, tlArrowBox, wigwagBox);
+  tlAssembly.add(tlPost, tlHead, tlRed, tlAmber, tlGreen, tlHaloRed, tlHaloAmber, tlHaloGreen, tlArrowBox, wigwagBox);
   trafficGroup.add(tlAssembly);
   scenarioRoot.add(trafficGroup);
 
@@ -541,12 +793,16 @@ import { createHongKongWorldProps } from "./world3d.js";
   const beaconGlowMat = new THREE.MeshStandardMaterial({
     color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 1.4, roughness: 0.25
   });
+  const beaconHalos = [];
   [-2.82, 2.82].forEach((bx) => {
     const bp = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 1.85, 8), darkMetalMat);
     bp.position.set(bx, 0.92, -3.15);
     const globe = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 12), beaconGlowMat);
     globe.position.set(bx, 1.94, -3.15);
-    zebraDecorGroup.add(bp, globe);
+    const bh = makeGlowHalo(0xf59e0b, 0.72, 0.65);
+    bh.position.set(bx, 1.94, -3.15);
+    beaconHalos.push(bh);
+    zebraDecorGroup.add(bp, globe, bh);
   });
   zebraDecorGroup.add(zebraRoad);
 
@@ -689,7 +945,9 @@ import { createHongKongWorldProps } from "./world3d.js";
   ambLightL.position.set(-0.22, 1.24, -0.45);
   const ambLightR = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.14, 0.18), ambBlueMat);
   ambLightR.position.set(0.22, 1.24, -0.45);
-  ambGroup.add(ambBody, ambStripe, ambLightL, ambLightR);
+  const ambHaloL = makeGlowHalo(0xef4444, 0.95, 0.85); ambHaloL.position.set(-0.22, 1.28, -0.45);
+  const ambHaloR = makeGlowHalo(0x3b82f6, 0.95, 0.85); ambHaloR.position.set(0.22, 1.28, -0.45);
+  ambGroup.add(ambBody, ambStripe, ambLightL, ambLightR, ambHaloL, ambHaloR);
   addNpcWheels(ambGroup, 0.54, [-0.72, 0.72]);
   [-0.36, 0.36].forEach((tx) => {
     const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.05), npcTailMat);
@@ -715,70 +973,108 @@ import { createHongKongWorldProps } from "./world3d.js";
   warningTriangleGroup.position.set(-1.55, 0, 2.55);
   scenarioRoot.add(warningTriangleGroup);
 
-  // 8. 3D HK Double-Decker Bus (grounded with wheels + rear tail lights!)
+  // 8. 3D HK Double-Decker Bus (KMB-style red + gold band + upper/lower glass decks + glowing LED route box!)
+  const busRouteTex = makeCanvasTexture(128, 48, (ctx, w, h) => {
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "900 32px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("1A  尖沙咀", w / 2, h / 2 + 2);
+  });
   const busGroup = new THREE.Group();
   busGroup.visible = false;
   const busBody = new THREE.Mesh(
-    new THREE.BoxGeometry(1.22, 1.65, 3.6),
-    new THREE.MeshPhysicalMaterial({ color: 0xb91c1c, roughness: 0.32, clearcoat: 0.7 })
+    new THREE.BoxGeometry(1.24, 1.72, 3.68),
+    new THREE.MeshPhysicalMaterial({ color: 0xc21e25, roughness: 0.26, metalness: 0.12, clearcoat: 0.85 })
   );
-  busBody.position.y = 1.02;
+  busBody.position.y = 1.06;
   busBody.castShadow = true;
   const busBand = new THREE.Mesh(
-    new THREE.BoxGeometry(1.24, 0.24, 3.62),
-    new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 })
+    new THREE.BoxGeometry(1.26, 0.22, 3.7),
+    new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.36 })
   );
-  busBand.position.y = 0.96;
-  const busGlass = new THREE.Mesh(
-    new THREE.BoxGeometry(1.235, 0.42, 3.2),
-    new THREE.MeshStandardMaterial({ color: 0x182230, roughness: 0.15 })
-  );
-  busGlass.position.y = 1.48;
-  busGroup.add(busBody, busBand, busGlass);
-  addNpcWheels(busGroup, 0.58, [-1.15, 0.95]);
+  busBand.position.y = 0.98;
+  const busWinMat = new THREE.MeshPhysicalMaterial({ color: 0x152030, roughness: 0.1, metalness: 0.25, clearcoat: 1.0 });
+  const busGlassTop = new THREE.Mesh(new THREE.BoxGeometry(1.255, 0.42, 3.38), busWinMat);
+  busGlassTop.position.y = 1.52;
+  const busGlassBot = new THREE.Mesh(new THREE.BoxGeometry(1.255, 0.34, 3.1), busWinMat);
+  busGlassBot.position.y = 0.66;
+  const busAcPod = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.14, 1.8), curbMat);
+  busAcPod.position.set(0, 1.98, 0.1);
+  const busRouteMat = new THREE.MeshStandardMaterial({
+    map: busRouteTex, emissive: 0xf59e0b, emissiveMap: busRouteTex, emissiveIntensity: 1.1
+  });
+  const busRouteFront = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.22), busRouteMat);
+  busRouteFront.position.set(0, 1.15, -1.855);
+  busRouteFront.rotation.y = Math.PI;
+  const busRouteRear = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.2), busRouteMat);
+  busRouteRear.position.set(0, 1.15, 1.855);
+  busGroup.add(busBody, busBand, busGlassTop, busGlassBot, busAcPod, busRouteFront, busRouteRear);
+  addNpcWheels(busGroup, 0.58, [-1.18, 0.96]);
   [-0.4, 0.4].forEach((tx) => {
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.11, 0.05), npcTailMat);
-    tl.position.set(tx, 0.46, 1.82);
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.11, 0.05), npcTailMat);
+    tl.position.set(tx, 0.46, 1.86);
     const hl = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.12, 0.05),
+      new THREE.BoxGeometry(0.24, 0.12, 0.05),
       new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfffbeb, emissiveIntensity: 2.2 })
     );
-    hl.position.set(tx, 0.46, -1.82);
-    busGroup.add(tl, hl);
+    hl.position.set(tx, 0.46, -1.86);
+    const busHlHalo = makeGlowHalo(0xfff4cc, 0.58, 0.55);
+    busHlHalo.position.set(tx, 0.46, -1.94);
+    busGroup.add(tl, hl, busHlHalo);
   });
   busGroup.position.set(-1.05, 0, -5.8);
   scenarioRoot.add(busGroup);
 
-  // 9. 3D NPC Lead Vehicle (grounded with wheels, tail lights, right blinker & animated 3D Driver Hand-Signal Arm!)
+  // 9. 3D Sculpted NPC Lead Vehicle (beveled profile, wheels, tail lights, right blinker & animated 3D Driver Hand-Signal Arm!)
   const npcCarGroup = new THREE.Group();
   npcCarGroup.visible = false;
+  const npcSideShape = new THREE.Shape();
+  npcSideShape.moveTo(-1.04, 0.17);
+  npcSideShape.lineTo(1.04, 0.17);
+  npcSideShape.lineTo(1.04, 0.45);
+  npcSideShape.lineTo(0.84, 0.56);
+  npcSideShape.lineTo(0.46, 0.6);
+  npcSideShape.lineTo(0.24, 0.87);
+  npcSideShape.lineTo(-0.5, 0.87);
+  npcSideShape.lineTo(-0.76, 0.57);
+  npcSideShape.lineTo(-1.02, 0.5);
+  npcSideShape.closePath();
+  const npcBodyGeo = new THREE.ExtrudeGeometry(npcSideShape, {
+    depth: 0.94, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.04, bevelSegments: 2
+  });
+  npcBodyGeo.translate(0, 0, -0.47);
+  npcBodyGeo.rotateY(Math.PI / 2);
   const npcBody = new THREE.Mesh(
-    new THREE.BoxGeometry(1.02, 0.36, 2.05),
-    new THREE.MeshPhysicalMaterial({ color: 0xe2e8f0, roughness: 0.28, metalness: 0.2, clearcoat: 0.85 })
+    npcBodyGeo,
+    new THREE.MeshPhysicalMaterial({ color: 0xe6ecf4, roughness: 0.22, metalness: 0.24, clearcoat: 0.95, clearcoatRoughness: 0.08 })
   );
-  npcBody.position.y = 0.38;
   npcBody.castShadow = true;
   const npcCabin = new THREE.Mesh(
-    new THREE.BoxGeometry(0.88, 0.32, 1.05),
-    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.15 })
+    new THREE.BoxGeometry(0.96, 0.24, 0.9),
+    new THREE.MeshPhysicalMaterial({ color: 0x182334, roughness: 0.08, metalness: 0.25, clearcoat: 1.0 })
   );
-  npcCabin.position.set(0, 0.7, 0.06);
+  npcCabin.position.set(0, 0.71, 0.08);
+  const npcBumperR = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.12, 0.1), darkMetalMat);
+  npcBumperR.position.set(0, 0.23, 1.04);
   [-0.34, 0.34].forEach((tx) => {
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.09, 0.05), npcTailMat);
-    tl.position.set(tx, 0.42, 1.04);
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.05), npcTailMat);
+    tl.position.set(tx, 0.42, 1.06);
     npcCarGroup.add(tl);
   });
   const npcRightBlinkerMat = new THREE.MeshStandardMaterial({
     color: 0xd97706, emissive: 0xf59e0b, emissiveIntensity: 0.08, roughness: 0.25
   });
   const npcBlinkRR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.05), npcRightBlinkerMat);
-  npcBlinkRR.position.set(0.46, 0.42, 1.045);
+  npcBlinkRR.position.set(0.46, 0.42, 1.065);
   const npcBlinkFR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.05), npcRightBlinkerMat);
-  npcBlinkFR.position.set(0.46, 0.4, -1.035);
+  npcBlinkFR.position.set(0.46, 0.4, -1.055);
   // 3D Driver Right Arm extending out HK right-hand-drive window for hand-signal questions (q64/q76/q115!)
   const driverArmPivot = new THREE.Group();
   driverArmPivot.visible = false;
-  driverArmPivot.position.set(0.46, 0.68, -0.02);
+  driverArmPivot.position.set(0.48, 0.68, -0.02);
   const armSleeve = new THREE.Mesh(
     new THREE.BoxGeometry(0.56, 0.13, 0.13),
     new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x9a3412, emissiveIntensity: 0.35, roughness: 0.45 })
@@ -790,7 +1086,7 @@ import { createHongKongWorldProps } from "./world3d.js";
   );
   armHand.position.set(0.66, 0, 0);
   driverArmPivot.add(armSleeve, armHand);
-  npcCarGroup.add(npcBody, npcCabin, npcBlinkRR, npcBlinkFR, driverArmPivot);
+  npcCarGroup.add(npcBody, npcCabin, npcBumperR, npcBlinkRR, npcBlinkFR, driverArmPivot);
   addNpcWheels(npcCarGroup, 0.5, [-0.64, 0.64]);
   npcCarGroup.position.set(-1.05, 0, -4.6);
   scenarioRoot.add(npcCarGroup);
@@ -879,119 +1175,183 @@ import { createHongKongWorldProps } from "./world3d.js";
   const wg = hkWorld.groups;
   const wt = hkWorld.textures;
 
-  // ==================== HERO 3D HK 1A PRIVATE CAR ====================
+  // ==================== HERO 3D HK 1A PRIVATE CAR (Sculpted Aerodynamic Hatchback + Glow Pools!) ====================
   const carRoot = new THREE.Group();
   const carBodyGroup = new THREE.Group();
   carRoot.add(carBodyGroup);
   worldPivot.add(carRoot);
 
   const paintMat = new THREE.MeshPhysicalMaterial({
-    color: 0x0b67c7, roughness: 0.22, metalness: 0.24, clearcoat: 1.0, clearcoatRoughness: 0.09
+    color: 0x0b67c7, roughness: 0.18, metalness: 0.32, clearcoat: 1.0, clearcoatRoughness: 0.06
   });
   const roofMat = new THREE.MeshPhysicalMaterial({
-    color: 0xf4f7fb, roughness: 0.26, metalness: 0.08, clearcoat: 0.9, clearcoatRoughness: 0.12
+    color: 0xf4f7fb, roughness: 0.22, metalness: 0.12, clearcoat: 0.95, clearcoatRoughness: 0.08
   });
-  const trimMat = new THREE.MeshStandardMaterial({ color: 0x1f2733, roughness: 0.65, metalness: 0.25 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x1b222e, roughness: 0.6, metalness: 0.28 });
   const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0x1a2636, roughness: 0.08, metalness: 0.18, clearcoat: 1.0, clearcoatRoughness: 0.05
+    color: 0x142030, roughness: 0.06, metalness: 0.24, clearcoat: 1.0, clearcoatRoughness: 0.04
   });
-  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.22, metalness: 0.85 });
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xe6edf5, roughness: 0.18, metalness: 0.9 });
+  const caliperMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.4 });
   const tireMat = new THREE.MeshStandardMaterial({ color: 0x191d24, roughness: 0.88, metalness: 0.05 });
 
   const headlightMat = new THREE.MeshStandardMaterial({ color: 0xfffbeb, emissive: 0xfff3c4, emissiveIntensity: 0.7, roughness: 0.15 });
-  const brakeLightMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, emissive: 0xef4444, emissiveIntensity: 0.35, roughness: 0.2 });
+  const brakeLightMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, emissive: 0xef4444, emissiveIntensity: 0.35, roughness: 0.18 });
   const reverseLightMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, emissive: 0xffffff, emissiveIntensity: 0.0, roughness: 0.2 });
   const blinkerLeftMat = new THREE.MeshStandardMaterial({ color: 0xd97706, emissive: 0xf59e0b, emissiveIntensity: 0.1, roughness: 0.25 });
   const blinkerRightMat = new THREE.MeshStandardMaterial({ color: 0xd97706, emissive: 0xf59e0b, emissiveIntensity: 0.1, roughness: 0.25 });
 
-  const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.34, 2.24), paintMat);
-  lowerBody.position.set(0, 0.37, 0);
+  // Sculpted beveled aerodynamic hatchback silhouette (2D side profile extruded along X!)
+  const heroProfile = new THREE.Shape();
+  heroProfile.moveTo(-1.12, 0.18);  // rear lower
+  heroProfile.lineTo(1.12, 0.18);   // front lower
+  heroProfile.lineTo(1.14, 0.38);   // front bumper nose
+  heroProfile.lineTo(0.96, 0.53);   // sloped hood front
+  heroProfile.lineTo(0.46, 0.59);   // base of front windshield
+  heroProfile.lineTo(0.16, 0.90);   // roof front brow
+  heroProfile.lineTo(-0.62, 0.90);  // roof rear spoiler edge
+  heroProfile.lineTo(-0.92, 0.62);  // raked rear hatch glass
+  heroProfile.lineTo(-1.10, 0.54);  // rear tail lip
+  heroProfile.lineTo(-1.14, 0.36);  // rear bumper
+  heroProfile.closePath();
+
+  const heroShellGeo = new THREE.ExtrudeGeometry(heroProfile, {
+    depth: 0.98,
+    bevelEnabled: true,
+    bevelThickness: 0.06,
+    bevelSize: 0.045,
+    bevelSegments: 3
+  });
+  heroShellGeo.translate(0, 0, -0.49);
+  heroShellGeo.rotateY(Math.PI / 2); // +X side profile now faces -Z (forward)!
+
+  const lowerBody = new THREE.Mesh(heroShellGeo, paintMat);
   lowerBody.castShadow = true;
   lowerBody.receiveShadow = true;
   carBodyGroup.add(lowerBody);
 
-  const bumperFront = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.15, 0.16), trimMat);
-  bumperFront.position.set(0, 0.25, -1.12);
-  bumperFront.castShadow = true;
-  const bumperRear = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.16, 0.16), trimMat);
-  bumperRear.position.set(0, 0.25, 1.12);
-  bumperRear.castShadow = true;
-  const grille = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.14, 0.04), chromeMat);
-  grille.position.set(0, 0.36, -1.13);
-  carBodyGroup.add(bumperFront, bumperRear, grille);
-
-  const cabinGlass = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.34, 1.18), glassMat);
-  cabinGlass.position.set(0, 0.7, 0.08);
-  cabinGlass.castShadow = true;
-  const cabinRoof = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.07, 1.08), roofMat);
-  cabinRoof.position.set(0, 0.89, 0.1);
+  // Contrasting crisp pearl-white floating roof cap + subtle rear spoiler lip
+  const cabinRoof = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.065, 0.84), roofMat);
+  cabinRoof.position.set(0, 0.93, 0.22);
   cabinRoof.castShadow = true;
-  carBodyGroup.add(cabinGlass, cabinRoof);
+  const rearSpoiler = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.045, 0.16), trimMat);
+  rearSpoiler.position.set(0, 0.93, 0.68);
+  rearSpoiler.rotation.x = 0.14;
+  // Tinted panoramic cabin glazing wrapping front, sides & sloped rear hatch
+  const sideGlass = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.23, 0.92), glassMat);
+  sideGlass.position.set(0, 0.74, 0.18);
+  const frontGlass = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.34, 0.04), glassMat);
+  frontGlass.position.set(0, 0.74, -0.34);
+  frontGlass.rotation.x = -0.68;
+  const rearGlass = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.31, 0.04), glassMat);
+  rearGlass.position.set(0, 0.75, 0.79);
+  rearGlass.rotation.x = 0.68;
+  carBodyGroup.add(cabinRoof, rearSpoiler, sideGlass, frontGlass, rearGlass);
 
-  const mirrorGeo = new THREE.BoxGeometry(0.14, 0.08, 0.1);
-  [-0.56, 0.56].forEach((mx) => {
+  // Sculpted lower rocker skirts, wheel-arch accent moldings, bumpers & chrome grille
+  const bumperFront = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.13, 0.16), trimMat);
+  bumperFront.position.set(0, 0.22, -1.11);
+  const bumperRear = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.14, 0.16), trimMat);
+  bumperRear.position.set(0, 0.22, 1.11);
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.12, 0.05), trimMat);
+  grille.position.set(0, 0.35, -1.16);
+  const grilleChrome = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.032, 0.06), chromeMat);
+  grilleChrome.position.set(0, 0.37, -1.17);
+  [-0.53, 0.53].forEach((sx) => {
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 1.24), trimMat);
+    skirt.position.set(sx, 0.19, 0);
+    carBodyGroup.add(skirt);
+  });
+  carBodyGroup.add(bumperFront, bumperRear, grille, grilleChrome);
+
+  const mirrorGeo = new THREE.BoxGeometry(0.15, 0.075, 0.11);
+  [-0.57, 0.57].forEach((mx) => {
     const mirror = new THREE.Mesh(mirrorGeo, paintMat);
-    mirror.position.set(mx, 0.58, -0.34);
+    mirror.position.set(mx, 0.62, -0.32);
     mirror.castShadow = true;
     carBodyGroup.add(mirror);
   });
 
-  const lampGeo = new THREE.BoxGeometry(0.2, 0.1, 0.05);
-  const smallLampGeo = new THREE.BoxGeometry(0.11, 0.08, 0.05);
+  // Modern LED tail-light bar + separate glowing brake/headlight halos!
+  const lampGeo = new THREE.BoxGeometry(0.24, 0.095, 0.055);
+  const smallLampGeo = new THREE.BoxGeometry(0.11, 0.08, 0.055);
+  const tailBar = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.04, 0.045), brakeLightMat);
+  tailBar.position.set(0, 0.45, 1.145);
+  carBodyGroup.add(tailBar);
 
+  const brakeHalos = [];
+  const headHalos = [];
   [-0.36, 0.36].forEach((lx) => {
-    const hl = new THREE.Mesh(lampGeo, headlightMat); hl.position.set(lx, 0.4, -1.12);
-    const tl = new THREE.Mesh(lampGeo, brakeLightMat); tl.position.set(lx, 0.42, 1.12);
-    carBodyGroup.add(hl, tl);
+    const hl = new THREE.Mesh(lampGeo, headlightMat); hl.position.set(lx, 0.41, -1.15);
+    const tl = new THREE.Mesh(lampGeo, brakeLightMat); tl.position.set(lx, 0.44, 1.15);
+    const bh = makeGlowHalo(0xef4444, 0.56, 0.25); bh.position.set(lx, 0.44, 1.22);
+    const hh = makeGlowHalo(0xfff4c8, 0.58, 0.18); hh.position.set(lx, 0.41, -1.22);
+    brakeHalos.push(bh);
+    headHalos.push(hh);
+    carBodyGroup.add(hl, tl, bh, hh);
   });
   [-0.18, 0.18].forEach((lx) => {
-    const rl = new THREE.Mesh(smallLampGeo, reverseLightMat); rl.position.set(lx, 0.42, 1.125);
+    const rl = new THREE.Mesh(smallLampGeo, reverseLightMat); rl.position.set(lx, 0.44, 1.155);
     carBodyGroup.add(rl);
   });
 
-  const blFL = new THREE.Mesh(smallLampGeo, blinkerLeftMat); blFL.position.set(-0.48, 0.38, -1.11);
-  const blRL = new THREE.Mesh(smallLampGeo, blinkerLeftMat); blRL.position.set(-0.48, 0.42, 1.125);
-  const blFR = new THREE.Mesh(smallLampGeo, blinkerRightMat); blFR.position.set(0.48, 0.38, -1.11);
-  const blRR = new THREE.Mesh(smallLampGeo, blinkerRightMat); blRR.position.set(0.48, 0.42, 1.125);
+  const blFL = new THREE.Mesh(smallLampGeo, blinkerLeftMat); blFL.position.set(-0.48, 0.39, -1.13);
+  const blRL = new THREE.Mesh(smallLampGeo, blinkerLeftMat); blRL.position.set(-0.48, 0.44, 1.155);
+  const blFR = new THREE.Mesh(smallLampGeo, blinkerRightMat); blFR.position.set(0.48, 0.39, -1.13);
+  const blRR = new THREE.Mesh(smallLampGeo, blinkerRightMat); blRR.position.set(0.48, 0.44, 1.155);
   carBodyGroup.add(blFL, blRL, blFR, blRR);
 
-  const beamGeo = new THREE.ConeGeometry(0.46, 2.4, 16, 1, true);
+  // Volumetric headlight cones + ground headlight & red brake reflection pools on asphalt!
+  const beamGeo = new THREE.ConeGeometry(0.52, 2.8, 16, 1, true);
   beamGeo.rotateX(Math.PI / 2);
   const beamMat = new THREE.MeshBasicMaterial({
     color: 0xfff2bf, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
   });
-  const beamL = new THREE.Mesh(beamGeo, beamMat); beamL.position.set(-0.36, 0.32, -2.32);
-  const beamR = new THREE.Mesh(beamGeo, beamMat); beamR.position.set(0.36, 0.32, -2.32);
-  carBodyGroup.add(beamL, beamR);
+  const beamL = new THREE.Mesh(beamGeo, beamMat); beamL.position.set(-0.36, 0.33, -2.55);
+  const beamR = new THREE.Mesh(beamGeo, beamMat); beamR.position.set(0.36, 0.33, -2.55);
+  const headGroundPoolMat = new THREE.MeshBasicMaterial({
+    map: glowHaloTex, color: 0xfff3c4, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const headGroundPool = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 4.6), headGroundPoolMat);
+  headGroundPool.rotation.x = -Math.PI / 2;
+  headGroundPool.position.set(0, 0.015, -3.45);
+  const brakeGroundPoolMat = new THREE.MeshBasicMaterial({
+    map: glowHaloTex, color: 0xef4444, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const brakeGroundPool = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.8), brakeGroundPoolMat);
+  brakeGroundPool.rotation.x = -Math.PI / 2;
+  brakeGroundPool.position.set(0, 0.015, 1.72);
+  carBodyGroup.add(beamL, beamR, headGroundPool, brakeGroundPool);
 
-  const pPlateMat = new THREE.MeshStandardMaterial({ map: pPlateTex, roughness: 0.35 });
+  const pPlateMat = new THREE.MeshStandardMaterial({ map: pPlateTex, roughness: 0.32 });
   const pPlateGeo = new THREE.BoxGeometry(0.24, 0.24, 0.02);
-  const pRear = new THREE.Mesh(pPlateGeo, pPlateMat); pRear.position.set(0.28, 0.67, 0.69); pRear.rotation.x = -0.14;
-  const pFront = new THREE.Mesh(pPlateGeo, pPlateMat); pFront.position.set(-0.32, 0.66, -0.52); pFront.rotation.x = 0.14;
+  const pRear = new THREE.Mesh(pPlateGeo, pPlateMat); pRear.position.set(0.28, 0.72, 0.90); pRear.rotation.x = -0.64;
+  const pFront = new THREE.Mesh(pPlateGeo, pPlateMat); pFront.position.set(-0.32, 0.72, -0.40); pFront.rotation.x = 0.64;
   carBodyGroup.add(pRear, pFront);
 
   const plateGeo = new THREE.PlaneGeometry(0.38, 0.11);
-  const rearPlate = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({ map: rearPlateTex, roughness: 0.4 }));
-  rearPlate.position.set(0, 0.29, 1.21);
-  const frontPlate = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({ map: frontPlateTex, roughness: 0.4 }));
-  frontPlate.position.set(0, 0.27, -1.21);
+  const rearPlate = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({ map: rearPlateTex, emissive: 0xfacc15, emissiveIntensity: 0.18, roughness: 0.38 }));
+  rearPlate.position.set(0, 0.28, 1.2);
+  const frontPlate = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({ map: frontPlateTex, roughness: 0.38 }));
+  frontPlate.position.set(0, 0.26, -1.2);
   frontPlate.rotation.y = Math.PI;
   carBodyGroup.add(rearPlate, frontPlate);
 
   const wheelSpinners = [];
   const frontWheelPivots = [];
   const wheelRadius = 0.21;
-  const tireGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, 0.17, 20);
+  const tireGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, 0.175, 22);
   tireGeo.rotateZ(Math.PI / 2);
-  const rimGeo = new THREE.CylinderGeometry(0.125, 0.125, 0.18, 12);
+  const rimGeo = new THREE.CylinderGeometry(0.132, 0.132, 0.182, 14);
   rimGeo.rotateZ(Math.PI / 2);
-  const spokeGeo = new THREE.BoxGeometry(0.19, 0.035, 0.2);
+  const spokeGeo = new THREE.BoxGeometry(0.19, 0.032, 0.22);
+  const caliperGeo = new THREE.BoxGeometry(0.11, 0.09, 0.075);
 
   [
-    { x: -0.54, z: -0.68, front: true },
-    { x: 0.54, z: -0.68, front: true },
-    { x: -0.54, z: 0.68, front: false },
-    { x: 0.54, z: 0.68, front: false }
+    { x: -0.55, z: -0.68, front: true },
+    { x: 0.55, z: -0.68, front: true },
+    { x: -0.55, z: 0.68, front: false },
+    { x: 0.55, z: 0.68, front: false }
   ].forEach((wc) => {
     const pivot = new THREE.Group();
     pivot.position.set(wc.x, wheelRadius, wc.z);
@@ -999,16 +1359,56 @@ import { createHongKongWorldProps } from "./world3d.js";
     const tire = new THREE.Mesh(tireGeo, tireMat); tire.castShadow = true;
     const rim = new THREE.Mesh(rimGeo, chromeMat);
     const spokeA = new THREE.Mesh(spokeGeo, trimMat);
-    const spokeB = new THREE.Mesh(spokeGeo, trimMat); spokeB.rotation.x = Math.PI / 2;
-    spin.add(tire, rim, spokeA, spokeB);
-    pivot.add(spin);
+    const spokeB = new THREE.Mesh(spokeGeo, trimMat); spokeB.rotation.x = Math.PI / 3;
+    const spokeC = new THREE.Mesh(spokeGeo, trimMat); spokeC.rotation.x = (Math.PI * 2) / 3;
+    spin.add(tire, rim, spokeA, spokeB, spokeC);
+    const caliper = new THREE.Mesh(caliperGeo, caliperMat);
+    caliper.position.set(wc.x < 0 ? 0.02 : -0.02, 0.04, 0.06);
+    pivot.add(spin, caliper);
     carRoot.add(pivot);
     wheelSpinners.push(spin);
     if (wc.front) frontWheelPivots.push(pivot);
   });
 
+  // Ground slope-parking front-wheel turn indicator arrow (makes uphill-right / downhill-left unmistakable!)
+  const slopeSteerArrowTex = makeCanvasTexture(128, 128, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#10b981";
+    ctx.beginPath();
+    ctx.moveTo(w * 0.5, 10);
+    ctx.lineTo(w * 0.86, 56);
+    ctx.lineTo(w * 0.64, 56);
+    ctx.lineTo(w * 0.64, 118);
+    ctx.lineTo(w * 0.36, 118);
+    ctx.lineTo(w * 0.36, 56);
+    ctx.lineTo(w * 0.14, 56);
+    ctx.closePath();
+    ctx.fill();
+  });
+  const slopeSteerArrow = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.75, 0.75),
+    new THREE.MeshBasicMaterial({ map: slopeSteerArrowTex, transparent: true, opacity: 0.95, depthWrite: false })
+  );
+  slopeSteerArrow.rotation.x = -Math.PI / 2;
+  slopeSteerArrow.position.set(-0.15, 0.026, -1.62);
+  slopeSteerArrow.visible = false;
+  carRoot.add(slopeSteerArrow);
+
+  // Rain tire spray droplets pooled behind rear wheels (zero allocations!)
+  const SPRAY_COUNT = 26;
+  const sprayGeo = new THREE.SphereGeometry(0.036, 6, 5);
+  const sprayMat = new THREE.MeshBasicMaterial({ color: 0xdbeafe, transparent: true, opacity: 0.48, depthWrite: false });
+  const sprayInst = new THREE.InstancedMesh(sprayGeo, sprayMat, SPRAY_COUNT);
+  sprayInst.visible = false;
+  sprayInst.frustumCulled = false;
+  worldPivot.add(sprayInst);
+  const sprayDrops = Array.from({ length: SPRAY_COUNT }, (_, idx) => ({
+    side: idx % 2 === 0 ? -0.55 : 0.55,
+    t: Math.random()
+  }));
+
   const shadowBlob = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.75, 2.95),
+    new THREE.PlaneGeometry(1.78, 2.98),
     new THREE.MeshBasicMaterial({ map: contactShadowTex, transparent: true, depthWrite: false })
   );
   shadowBlob.rotation.x = -Math.PI / 2;
@@ -1117,7 +1517,9 @@ import { createHongKongWorldProps } from "./world3d.js";
     isVisible: true,
     isDark: isDarkTheme(),
     animRunning: false,
-    hasExternalMount: false
+    hasExternalMount: false,
+    cameraMode: "chase", // "chase" | "pov" | "top"
+    replayTimeoutId: null
   };
 
   carRoot.position.set(LEFT_LANE_X, 0, 0.25);
@@ -1212,10 +1614,16 @@ import { createHongKongWorldProps } from "./world3d.js";
     roundaboutGroup.position.set(0, 0, 0);
     tunnelGroup.visible = false;
     rainInst.visible = false;
+    sprayInst.visible = false;
+    slopeSteerArrow.visible = false;
     curbYellow1.visible = true;
     curbYellow2.visible = false;
     leftCurb.visible = true;
     rightCurb.visible = true;
+    leftSidewalk.visible = true;
+    rightSidewalk.visible = true;
+    hkRailLeftGroup.visible = true;
+    hkRailRightGroup.visible = true;
     dashInst.visible = true;
     studsLeft.visible = true;
     studsMid.visible = true;
@@ -1226,6 +1634,10 @@ import { createHongKongWorldProps } from "./world3d.js";
     gantryBoardMat.needsUpdate = true;
     for (const prop of roadsideProps) prop.visible = true;
     spPoleMat.color.setHex(0x94a3b8);
+    if (state.replayTimeoutId) {
+      clearTimeout(state.replayTimeoutId);
+      state.replayTimeoutId = null;
+    }
     hkWorld.resetAll();
 
     // Reset gantry lane signals to green down arrow
@@ -2390,6 +2802,42 @@ import { createHongKongWorldProps } from "./world3d.js";
       for (const prop of roadsideProps) prop.visible = false;
     }
 
+    // Smartly show authentic HK sidewalks & galvanized guardrails ONLY where they fit real HK road geometry (zero clipping!)
+    const hideLeftPavement =
+      !leftCurb.visible ||
+      wg.crossroadGroup.visible ||
+      wg.narrowRoadGroup.visible ||
+      wg.sideRoadGroup.visible ||
+      roundaboutGroup.visible ||
+      wg.slipRoadGroup.visible ||
+      wg.cycleTrackMesh.visible ||
+      tunnelGroup.visible;
+    const hideRightPavement =
+      !rightCurb.visible ||
+      wg.crossroadGroup.visible ||
+      wg.narrowRoadGroup.visible ||
+      roundaboutGroup.visible ||
+      wg.threeLaneGroup.visible ||
+      tunnelGroup.visible;
+    leftSidewalk.visible = !hideLeftPavement;
+    rightSidewalk.visible = !hideRightPavement;
+    // Keep guardrails off immediate pedestrian crossings, colored pole kerbs, slope close-up & expressways
+    const isExpresswayLike = gantry.visible && !wg.cityBuildingsGroup.visible;
+    hkRailLeftGroup.visible =
+      !hideLeftPavement &&
+      !zebraGroup.visible &&
+      !trafficGroup.visible &&
+      !wg.coloredPolesGroup.visible &&
+      !wg.parkingBayGroup.visible &&
+      !(kind === "slope_hill" && state.scenarioStopped) &&
+      !isExpresswayLike;
+    hkRailRightGroup.visible =
+      !hideRightPavement &&
+      !zebraGroup.visible &&
+      !isExpresswayLike;
+    // Keep distant HK skyline visible outdoors, hidden inside enclosed tunnels!
+    if (wg.hkSkylineGroup) wg.hkSkylineGroup.visible = !tunnelGroup.visible;
+
     // Ground roadside signpost cleanly outside curb on pavement (right side if traffic light occupies left)
     // Stands cleanly IN FRONT of the outward streetlamps (x = -3.35) AND clear of curb-hugging cars!
     if (trafficGroup.visible && signPostGroup.visible) {
@@ -2428,6 +2876,8 @@ import { createHongKongWorldProps } from "./world3d.js";
   // Reusable math scratch objects (ZERO per-frame heap allocations!)
   const dummy = new THREE.Object3D();
   const targetBgColor = new THREE.Color();
+  const targetSkyTop = new THREE.Color();
+  const targetSkyGround = new THREE.Color();
   const targetVergeColor = new THREE.Color();
   const raycaster = new THREE.Raycaster();
   raycaster.layers.set(1);
@@ -2438,8 +2888,12 @@ import { createHongKongWorldProps } from "./world3d.js";
   const hudGearBtns = Array.from(document.querySelectorAll(".gear-btn"));
   const hudLaneBtn = document.getElementById("btn-3d-lane");
   const hudHonkBtn = document.getElementById("btn-3d-honk");
+  const hudCamBtn = document.getElementById("btn-3d-cam");
+  const hudReplayBtn = document.getElementById("btn-3d-replay");
   const hudStatus = document.getElementById("stage-3d-status");
   const hudSpeed = document.getElementById("stage-3d-speed");
+
+  const CAM_LABELS = { chase: "視角：追尾", pov: "視角：司機位", top: "視角：俯視" };
 
   function updateHudUI() {
     hudGearBtns.forEach((b) => {
@@ -2449,6 +2903,16 @@ import { createHongKongWorldProps } from "./world3d.js";
     });
     if (hudLaneBtn) {
       hudLaneBtn.textContent = state.lane === "left" ? "切右線超車" : "返回左線";
+    }
+    if (hudCamBtn) {
+      hudCamBtn.hidden = state.mode !== "quiz";
+      hudCamBtn.textContent = CAM_LABELS[state.cameraMode] || CAM_LABELS.chase;
+    }
+    if (hudReplayBtn) {
+      const canReplay = state.mode === "quiz" && state.scenarioOutcome !== null && Boolean(state.activeQuestion);
+      hudReplayBtn.hidden = !canReplay;
+      hudReplayBtn.classList.toggle("is-highlight", state.scenarioOutcome === "wrong");
+      hudReplayBtn.textContent = state.scenarioOutcome === "wrong" ? "重播正確做法 ▶" : "重播示範 ▶";
     }
     if (hudStatus) {
       if (state.mode === "summary") {
@@ -2469,6 +2933,43 @@ import { createHongKongWorldProps } from "./world3d.js";
         hudStatus.textContent = `3D 模擬車道 · ${gearText}`;
       }
     }
+  }
+
+  function setCameraMode(mode) {
+    if (!["chase", "pov", "top"].includes(mode)) return;
+    state.cameraMode = mode;
+    snapQuizCameraForScenario();
+    updateHudUI();
+    if (prefersReducedMotion()) renderSingleFrame();
+  }
+
+  function cycleCameraMode() {
+    const order = ["chase", "pov", "top"];
+    const next = order[(order.indexOf(state.cameraMode) + 1) % order.length];
+    setCameraMode(next);
+  }
+
+  function replayCorrectDemo() {
+    const q = state.activeQuestion;
+    if (state.mode !== "quiz" || !q) return;
+    const savedReveal = state.scenarioRevealLabel || state.scenarioLabel;
+    applyQuestionScenario(q);
+    state.scenarioRevealLabel = savedReveal;
+    state.scenarioLabel = `${savedReveal} · 重播示範中`;
+    state.scenarioOutcome = "right";
+    updateHudUI();
+    if (prefersReducedMotion()) {
+      applyAnsweredPosture(true, q, { silent: false, combo: state.combo });
+      updateHudUI();
+      renderSingleFrame();
+      return;
+    }
+    state.replayTimeoutId = setTimeout(() => {
+      state.replayTimeoutId = null;
+      if (state.activeQuestion?.id !== q.id) return;
+      applyAnsweredPosture(true, q, { silent: false, combo: state.combo });
+      updateHudUI();
+    }, 240);
   }
 
   function setGear(g) {
@@ -2506,6 +3007,8 @@ import { createHongKongWorldProps } from "./world3d.js";
   });
   if (hudLaneBtn) hudLaneBtn.addEventListener("click", toggleLane);
   if (hudHonkBtn) hudHonkBtn.addEventListener("click", triggerHonkBoost);
+  if (hudCamBtn) hudCamBtn.addEventListener("click", cycleCameraMode);
+  if (hudReplayBtn) hudReplayBtn.addEventListener("click", replayCorrectDemo);
 
   let downX = 0;
   let downY = 0;
@@ -2539,10 +3042,18 @@ import { createHongKongWorldProps } from "./world3d.js";
       raycaster.intersectObjects(pickables, false).length > 0 ? "pointer" : "grab";
   });
 
-  // ==================== MOUNTING & CAMERA MODES ====================
+  // ==================== MOUNTING & CAMERA MODES (CHASE / DRIVER POV / BIRD'S-EYE TOP) ====================
   function snapQuizCameraForScenario() {
     if (state.mode !== "quiz") return;
-    if ((state.scenario === "slope_hill" && state.scenarioStopped) || /輪胎胎紋|胎紋/.test(state.activeQuestion?.prompt || "")) {
+    if (state.cameraMode === "pov") {
+      // HK Right-Hand-Drive Driver Windshield POV: clear view over blue bonnet down the road ahead!
+      camera.position.set(carRoot.position.x + 0.18, 1.04, carRoot.position.z - 0.36);
+      controls.target.set(carRoot.position.x + 0.06, 0.72, carRoot.position.z - 12.0);
+    } else if (state.cameraMode === "top") {
+      // Bird's-Eye Overview: crystal-clear view of roundabouts, yellow boxes, road markings & lane positioning!
+      camera.position.set(0, 7.6, 3.2);
+      controls.target.set(0, 0.0, -4.5);
+    } else if ((state.scenario === "slope_hill" && state.scenarioStopped) || /輪胎胎紋|胎紋/.test(state.activeQuestion?.prompt || "")) {
       // Low side-kerb close-up angled along front-left wheel & kerb so wheel turn right/left + slope tilt + tire are unmistakable!
       camera.position.set(-3.05, 1.12, 1.55);
       controls.target.set(-1.35, 0.34, -0.55);
@@ -2866,6 +3377,8 @@ import { createHongKongWorldProps } from "./world3d.js";
     supportsQuestion(q) {
       return !!(q && !HIDE_3D_IDS.has(q.id));
     },
+    setCameraMode,
+    replayCorrectDemo,
     setTheme(dark) {
       state.isDark = !!dark;
       if (prefersReducedMotion()) renderSingleFrame();
@@ -2922,34 +3435,70 @@ import { createHongKongWorldProps } from "./world3d.js";
   timer.connect(document);
 
   function updateThemeAndWeather(dt) {
-    const forceNight = state.mode === "quiz" && (state.scenarioWeather === "night" || state.scenarioWeather === "rain");
+    const isRain = state.mode === "quiz" && state.scenarioWeather === "rain";
+    const isNightWeather = state.mode === "quiz" && state.scenarioWeather === "night";
     const isFog = state.mode === "quiz" && state.scenarioWeather === "fog";
+    const forceNight = isNightWeather || isRain;
     const dark = state.isDark || forceNight;
 
-    const skyHex = isFog ? (state.isDark ? 0x1e293b : 0xdce4ed) : dark ? 0x0f1724 : 0xeaf3fb;
-    targetBgColor.setHex(skyHex);
+    const horizonHex = isFog
+      ? (state.isDark ? 0x1e293b : 0xdce4ed)
+      : isRain
+        ? 0x263547
+        : dark
+          ? 0x132036
+          : 0xdbeeff;
+    const topHex = isFog
+      ? (state.isDark ? 0x131d2d : 0x9cb1c4)
+      : isRain
+        ? 0x101827
+        : dark
+          ? 0x050914
+          : 0x4f9ae3;
+    const groundHex = dark ? 0x0b1521 : 0x89a89a;
+
+    targetBgColor.setHex(horizonHex);
+    targetSkyTop.setHex(topHex);
+    targetSkyGround.setHex(groundHex);
     const lerpSpeed = dt > 0 ? Math.min(1, dt * 6.5) : 1;
     bgColor.lerp(targetBgColor, lerpSpeed);
     fog.color.copy(bgColor);
-    fog.near = THREE.MathUtils.damp(fog.near, isFog ? 5.5 : dark ? 11 : 14, 5, dt || 0.16);
-    fog.far = THREE.MathUtils.damp(fog.far, isFog ? 16 : dark ? 28 : 34, 5, dt || 0.16);
+    skyUniforms.uHorizonColor.value.copy(bgColor);
+    skyUniforms.uTopColor.value.lerp(targetSkyTop, lerpSpeed);
+    skyUniforms.uGroundColor.value.lerp(targetSkyGround, lerpSpeed);
+    skyUniforms.uSunIntensity.value = THREE.MathUtils.damp(skyUniforms.uSunIntensity.value, !dark && !isFog && !isRain ? 1.0 : 0.0, 5, dt || 0.16);
+    skyUniforms.uStarIntensity.value = THREE.MathUtils.damp(skyUniforms.uStarIntensity.value, dark && !isFog && !isRain ? 0.9 : 0.0, 5, dt || 0.16);
 
-    sunLight.intensity = THREE.MathUtils.damp(sunLight.intensity, dark ? 0.95 : isFog ? 1.5 : 2.55, 6, dt || 0.16);
-    hemiLight.intensity = THREE.MathUtils.damp(hemiLight.intensity, dark ? 0.55 : 0.92, 6, dt || 0.16);
-    scene.environmentIntensity = THREE.MathUtils.damp(scene.environmentIntensity, dark ? 0.42 : 0.74, 6, dt || 0.16);
-    targetVergeColor.setHex(dark ? 0x16382b : 0x3d8b63);
+    fog.near = THREE.MathUtils.damp(fog.near, isFog ? 5.5 : dark ? 12 : 16, 5, dt || 0.16);
+    fog.far = THREE.MathUtils.damp(fog.far, isFog ? 16 : dark ? 31 : 38, 5, dt || 0.16);
+
+    sunLight.intensity = THREE.MathUtils.damp(sunLight.intensity, dark ? 0.95 : isFog ? 1.55 : 2.6, 6, dt || 0.16);
+    hemiLight.intensity = THREE.MathUtils.damp(hemiLight.intensity, dark ? 0.56 : 0.95, 6, dt || 0.16);
+    scene.environmentIntensity = THREE.MathUtils.damp(scene.environmentIntensity, isRain ? 0.88 : dark ? 0.45 : 0.78, 6, dt || 0.16);
+
+    // Dynamic Wet Asphalt PBR response: glossy specular tarmac when raining or flooded!
+    const isWet = isRain || wg.floodWaterMesh.visible || wg.slipperyPatchGroup.visible;
+    roadMat.roughness = THREE.MathUtils.damp(roadMat.roughness, isWet ? 0.22 : 0.92, 5, dt || 0.16);
+    roadMat.metalness = THREE.MathUtils.damp(roadMat.metalness, isWet ? 0.26 : 0.05, 5, dt || 0.16);
+
+    targetVergeColor.setHex(dark ? 0x456b58 : 0xffffff);
     vergeMat.color.lerp(targetVergeColor, lerpSpeed);
-    lampHeadMat.emissiveIntensity = THREE.MathUtils.damp(lampHeadMat.emissiveIntensity, dark ? 2.4 : 0.2, 6, dt || 0.16);
-    gantryBoardMat.emissiveIntensity = THREE.MathUtils.damp(gantryBoardMat.emissiveIntensity, dark ? 0.48 : 0.14, 6, dt || 0.16);
+    lampHeadMat.emissiveIntensity = THREE.MathUtils.damp(lampHeadMat.emissiveIntensity, dark ? 2.5 : 0.2, 6, dt || 0.16);
+    const lampHaloOp = dark ? 0.72 : 0.0;
+    for (const sh of streetLampHalos) sh.material.opacity = THREE.MathUtils.damp(sh.material.opacity, lampHaloOp, 6, dt || 0.16);
+    gantryBoardMat.emissiveIntensity = THREE.MathUtils.damp(gantryBoardMat.emissiveIntensity, dark ? 0.52 : 0.16, 6, dt || 0.16);
 
-    const studGlow = dark ? 1.6 : 0.2;
+    const studGlow = dark ? 1.7 : 0.2;
     studRedMat.emissiveIntensity = studGlow;
     studWhiteMat.emissiveIntensity = studGlow;
     studAmberMat.emissiveIntensity = studGlow;
 
-    const targetBeamOpacity = state.flashTimer > 0 ? 0.34 : (dark || isFog) ? 0.2 : 0.0;
+    const targetBeamOpacity = state.flashTimer > 0 ? 0.36 : (dark || isFog) ? 0.22 : 0.0;
     beamMat.opacity = THREE.MathUtils.damp(beamMat.opacity, targetBeamOpacity, 10, dt || 0.16);
+    headGroundPoolMat.opacity = THREE.MathUtils.damp(headGroundPoolMat.opacity, state.flashTimer > 0 ? 0.52 : (dark || isFog) ? 0.32 : 0.0, 10, dt || 0.16);
     headlightMat.emissiveIntensity = state.flashTimer > 0 ? 3.2 : (dark || isFog) ? 2.2 : 0.65;
+    const headHaloOp = state.flashTimer > 0 ? 0.85 : (dark || isFog) ? 0.55 : 0.12;
+    for (const hh of headHalos) hh.material.opacity = headHaloOp;
   }
 
   function stepScene(dt, elapsed) {
@@ -2982,6 +3531,13 @@ import { createHongKongWorldProps } from "./world3d.js";
     state.roadSpeed = THREE.MathUtils.damp(state.roadSpeed, desiredSpeed, 4.8, dt);
     state.roadOffset = (state.roadOffset + state.roadSpeed * dt) % 10000;
 
+    // 1:1 Ground-locked scrolling for procedural PBR asphalt, HK sidewalk tiles & kerb blocks!
+    const roadTexV = -(state.roadOffset / roadLen) * 11;
+    asphaltColorTex.offset.y = roadTexV;
+    asphaltRoughTex.offset.y = roadTexV;
+    pavementTex.offset.y = -(state.roadOffset / roadLen) * 22;
+    curbTex.offset.y = -(state.roadOffset / roadLen) * 22;
+
     if (hudSpeed) {
       const kmh = state.gear === "P" || state.mode === "summary" || Math.abs(state.roadSpeed) < 0.15
         ? 0
@@ -2989,7 +3545,7 @@ import { createHongKongWorldProps } from "./world3d.js";
       hudSpeed.textContent = `${state.gear} · ${kmh} km/h`;
     }
 
-    // Update scrolling instanced road dashes & cat's-eyes
+    // Update scrolling instanced road dashes, HK cat's-eyes & HK galvanized pedestrian guardrail posts
     const totalDashSpan = DASH_COUNT * DASH_STEP;
     const modOff = ((state.roadOffset % DASH_STEP) + DASH_STEP) % DASH_STEP;
     for (let i = 0; i < DASH_COUNT; i++) {
@@ -3016,6 +3572,24 @@ import { createHongKongWorldProps } from "./world3d.js";
     studsLeft.instanceMatrix.needsUpdate = true;
     studsMid.instanceMatrix.needsUpdate = true;
     studsRight.instanceMatrix.needsUpdate = true;
+
+    if (hkRailLeftGroup.visible || hkRailRightGroup.visible) {
+      const totalRailSpan = RAIL_COUNT * RAIL_STEP;
+      const rMod = ((state.roadOffset % RAIL_STEP) + RAIL_STEP) % RAIL_STEP;
+      for (let i = 0; i < RAIL_COUNT; i++) {
+        const rz = -totalRailSpan * 0.72 + i * RAIL_STEP + rMod;
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.position.set(-roadWidth / 2 - 0.34, 0.36, rz);
+        dummy.updateMatrix();
+        railPostInstL.setMatrixAt(i, dummy.matrix);
+        dummy.position.set(roadWidth / 2 + 0.34, 0.36, rz);
+        dummy.updateMatrix();
+        railPostInstR.setMatrixAt(i, dummy.matrix);
+      }
+      railPostInstL.instanceMatrix.needsUpdate = true;
+      railPostInstR.instanceMatrix.needsUpdate = true;
+    }
 
     // Scroll roadside props & gantry (1:1 synced with ground roadSpeed — nothing hovers glued to the car!)
     for (const prop of roadsideProps) {
@@ -3066,11 +3640,20 @@ import { createHongKongWorldProps } from "./world3d.js";
     }
 
     // Animate modular real-world HK 3D road actors & dynamic scrolling structures
+    const isDarkNow = state.isDark || state.scenarioWeather === "night" || state.scenarioWeather === "rain";
     hkWorld.animate(dt, elapsed, {
       roadSpeed: state.roadSpeed,
       roadOffset: state.roadOffset,
-      greenManFlash: state.scenarioGreenManFlash
+      greenManFlash: state.scenarioGreenManFlash,
+      isNight: isDarkNow
     });
+
+    // Traffic-light lens glow halos track active lenses cleanly!
+    if (trafficGroup.visible) {
+      tlHaloRed.material.opacity = tlRed.visible && tlRedMat.emissiveIntensity > 1.0 ? 0.78 : 0.0;
+      tlHaloAmber.material.opacity = tlAmber.visible && tlAmberMat.emissiveIntensity > 1.0 ? 0.78 : 0.0;
+      tlHaloGreen.material.opacity = tlGreen.visible && tlGreenMat.emissiveIntensity > 1.0 ? 0.78 : 0.0;
+    }
 
     // Animate scenario-specific dynamic props
     if (state.scenarioAmberGantry) {
@@ -3085,9 +3668,13 @@ import { createHongKongWorldProps } from "./world3d.js";
       const alt = Math.floor(elapsed * 2.4) % 2 === 0;
       wwLeftMat.emissiveIntensity = alt ? 2.8 : 0.08;
       wwRightMat.emissiveIntensity = alt ? 0.08 : 2.8;
+      wwHaloL.material.opacity = alt ? 0.85 : 0.0;
+      wwHaloR.material.opacity = alt ? 0.0 : 0.85;
     }
     if (zebraGroup.visible) {
-      beaconGlowMat.emissiveIntensity = 0.7 + (Math.sin(elapsed * 5.2) * 0.5 + 0.5) * 1.6;
+      const bWave = Math.sin(elapsed * 5.2) * 0.5 + 0.5;
+      beaconGlowMat.emissiveIntensity = 0.7 + bWave * 1.6;
+      for (const bh of beaconHalos) bh.material.opacity = 0.25 + bWave * 0.62;
       const pedRate = state.scenarioPedSlow ? 0.45 : 0.9;
       pedGroup.position.x = Math.sin(elapsed * pedRate) * 1.5;
       pedGroup.position.y = Math.abs(Math.sin(elapsed * pedRate * 7.0)) * 0.04;
@@ -3102,6 +3689,8 @@ import { createHongKongWorldProps } from "./world3d.js";
       const alt = Math.floor(elapsed * 6.5) % 2 === 0;
       ambRedMat.emissiveIntensity = alt ? 3.2 : 0.2;
       ambBlueMat.emissiveIntensity = alt ? 0.2 : 3.2;
+      ambHaloL.material.opacity = alt ? 0.88 : 0.08;
+      ambHaloR.material.opacity = alt ? 0.08 : 0.88;
       ambGroup.position.z -= dt * 3.8;
       if (ambGroup.position.z < -15.5) ambGroup.position.z = 2.6;
     }
@@ -3163,28 +3752,64 @@ import { createHongKongWorldProps } from "./world3d.js";
     carRoot.rotation.y = THREE.MathUtils.damp(carRoot.rotation.y, state.targetCarYaw, 5.0, dt);
 
     const latVel = dt > 0.0001 ? (carRoot.position.x - prevX) / dt : 0;
-    let steerAngle = THREE.MathUtils.clamp(-latVel * 0.16, -0.34, 0.34);
-    if (state.scenarioParkedWheel === "right") steerAngle = -0.52;
-    else if (state.scenarioParkedWheel === "left") steerAngle = 0.52;
+    let steerAngle = THREE.MathUtils.clamp(-latVel * 0.18, -0.36, 0.36);
+    if (state.scenarioParkedWheel === "right") steerAngle = -0.62;
+    else if (state.scenarioParkedWheel === "left") steerAngle = 0.62;
 
     for (const fp of frontWheelPivots) {
       fp.rotation.y = THREE.MathUtils.damp(fp.rotation.y, steerAngle, 10, dt);
     }
 
+    // Slope parking directional steering indicator arrow on ground beside front-left wheel!
+    if (state.scenarioParkedWheel) {
+      slopeSteerArrow.visible = true;
+      slopeSteerArrow.rotation.z = state.scenarioParkedWheel === "right" ? -0.68 : 0.68;
+      slopeSteerArrow.material.opacity = 0.62 + Math.sin(elapsed * 5.0) * 0.28;
+    } else {
+      slopeSteerArrow.visible = false;
+    }
+
     const wheelDelta = (state.roadSpeed * dt) / wheelRadius;
     for (const ws of wheelSpinners) ws.rotation.x -= wheelDelta;
+
+    // Rain tire spray droplets kicking up behind both rear tires when moving in rain!
+    const showSpray = rainInst.visible && Math.abs(state.roadSpeed) > 0.6;
+    sprayInst.visible = showSpray;
+    if (showSpray) {
+      for (let i = 0; i < SPRAY_COUNT; i++) {
+        const sp = sprayDrops[i];
+        sp.t = (sp.t + dt * 2.1) % 1;
+        const px = carRoot.position.x + sp.side + Math.sin(i * 4.7) * 0.14 * sp.t;
+        const py = 0.06 + Math.sin(sp.t * Math.PI) * 0.38;
+        const pz = carRoot.position.z + 0.78 + sp.t * 1.45;
+        dummy.position.set(px, py, pz);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.setScalar((1 - sp.t) * 1.15);
+        dummy.updateMatrix();
+        sprayInst.setMatrixAt(i, dummy.matrix);
+      }
+      sprayInst.instanceMatrix.needsUpdate = true;
+    }
 
     const hopY = Math.sin(state.hopPhase * Math.PI) * 0.15;
     const engineVib = Math.sin(elapsed * (state.roadSpeed !== 0 ? 18 : 11)) * (state.gear === "P" ? 0.003 : 0.008);
     carBodyGroup.position.y = hopY + engineVib;
-    carBodyGroup.rotation.z = THREE.MathUtils.damp(carBodyGroup.rotation.z, -latVel * 0.055, 8, dt);
-    const targetPitch = state.brakeTimer > 0 && Math.abs(state.roadSpeed) > 0.3 ? -0.05 : state.boostTimer > 0 ? 0.04 : 0;
-    carBodyGroup.rotation.x = THREE.MathUtils.damp(carBodyGroup.rotation.x, targetPitch, 9, dt);
+    carBodyGroup.rotation.z = THREE.MathUtils.damp(carBodyGroup.rotation.z, -latVel * 0.072, 7.5, dt);
+    const targetPitch = state.brakeTimer > 0 && Math.abs(state.roadSpeed) > 0.3 ? -0.068 : state.boostTimer > 0 ? 0.052 : 0;
+    carBodyGroup.rotation.x = THREE.MathUtils.damp(carBodyGroup.rotation.x, targetPitch, 8.5, dt);
 
-    // Brake, reverse & blinker lamps
+    // Brake, reverse, blinker lamps + glowing red brake halos & asphalt reflection pool!
     const demoBrakePulse = state.scenarioBrakeDemo && Math.floor(elapsed * 1.4) % 2 === 0;
     const braking = state.brakeTimer > 0 || state.gear === "P" || state.scenarioStopped || demoBrakePulse;
-    brakeLightMat.emissiveIntensity = braking ? 2.8 : (state.isDark || state.scenarioWeather === "night") ? 0.9 : 0.28;
+    brakeLightMat.emissiveIntensity = braking ? 3.0 : isDarkNow ? 0.95 : 0.3;
+    const targetBrakeHalo = braking ? 0.78 : isDarkNow ? 0.28 : 0.08;
+    for (const bh of brakeHalos) bh.material.opacity = targetBrakeHalo;
+    brakeGroundPoolMat.opacity = THREE.MathUtils.damp(
+      brakeGroundPoolMat.opacity,
+      braking ? (isDarkNow ? 0.55 : 0.3) : isDarkNow ? 0.16 : 0.0,
+      9,
+      dt || 0.16
+    );
     reverseLightMat.emissiveIntensity = state.gear === "R" ? 2.4 : 0.0;
 
     const blinkOn = Math.floor(elapsed * 6) % 2 === 0;
@@ -3192,6 +3817,16 @@ import { createHongKongWorldProps } from "./world3d.js";
     const rightBlink = (state.hazardTimer > 0 || (state.blinkerTimer > 0 && state.blinkerDir > 0)) && blinkOn;
     blinkerLeftMat.emissiveIntensity = leftBlink ? 2.8 : 0.08;
     blinkerRightMat.emissiveIntensity = rightBlink ? 2.8 : 0.08;
+
+    // Live POV cockpit camera follows smooth lane changes & overtakes!
+    if (state.mode === "quiz" && state.cameraMode === "pov") {
+      camera.position.x = THREE.MathUtils.damp(camera.position.x, carRoot.position.x + 0.18, 8, dt);
+      camera.position.y = THREE.MathUtils.damp(camera.position.y, 1.04 + hopY * 0.4, 8, dt);
+      camera.position.z = THREE.MathUtils.damp(camera.position.z, carRoot.position.z - 0.36, 8, dt);
+      controls.target.x = THREE.MathUtils.damp(controls.target.x, carRoot.position.x + 0.06, 8, dt);
+      controls.target.y = THREE.MathUtils.damp(controls.target.y, 0.72, 8, dt);
+      controls.target.z = THREE.MathUtils.damp(controls.target.z, carRoot.position.z - 12.0, 8, dt);
+    }
 
     // Trophy animation
     if (trophyGroup.visible) {
