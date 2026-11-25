@@ -2066,7 +2066,38 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   height: 196px;
 }
 
-.stage-3d-shell[data-mode="quiz"] .stage-3d-viewport { height: 132px; }
+.stage-3d-shell[data-mode="quiz"] {
+  display: flex;
+  flex-direction: column;
+}
+.stage-3d-shell[data-mode="quiz"] .stage-3d-viewport {
+  height: 144px;
+  order: 2;
+}
+.stage-3d-shell[data-mode="quiz"] .stage-3d-top {
+  position: static;
+  order: 1;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  pointer-events: auto;
+}
+.stage-3d-shell[data-mode="quiz"] .stage-3d-pill {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.stage-3d-shell[data-mode="quiz"] #stage-3d-speed {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .stage-3d-shell[data-mode="summary"] .stage-3d-viewport { height: 156px; }
 .stage-3d-shell[data-mode="quiz"] .stage-3d-bottom,
 .stage-3d-shell[data-mode="summary"] .stage-3d-bottom { display: none; }
@@ -2129,13 +2160,13 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   line-height: 1.3;
 }
 
-:root[data-theme="dark"] .stage-3d-pill {
+:root[data-theme="dark"] .stage-3d-shell:not([data-mode="quiz"]) .stage-3d-pill {
   background: rgba(15, 23, 36, 0.78);
   border-color: rgba(255, 255, 255, 0.14);
   color: #f3f5f8;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .stage-3d-pill {
+  :root:not([data-theme="light"]) .stage-3d-shell:not([data-mode="quiz"]) .stage-3d-pill {
     background: rgba(15, 23, 36, 0.78);
     border-color: rgba(255, 255, 255, 0.14);
     color: #f3f5f8;
@@ -2289,7 +2320,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   .lb-cell span { font-size: 0.68rem; }
   .lb-cell small { font-size: 0.62rem; }
   .stage-3d-viewport { height: 172px; }
-  .stage-3d-shell[data-mode="quiz"] .stage-3d-viewport { height: 110px; }
+  .stage-3d-shell[data-mode="quiz"] .stage-3d-viewport { height: 124px; }
   .stage-3d-hint, .stage-3d-quiz-hint { display: none; }
 }
 

@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { createHongKongWorldProps } from "./world3d.js";
 
 (() => {
   "use strict";
@@ -825,6 +826,30 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     spd: 7 + Math.random() * 4
   }));
 
+  // 13..30. Modular Real-World HK 3D Road Transformations & Actors (world3d.js)
+  const hkWorld = createHongKongWorldProps({
+    THREE,
+    scenarioRoot,
+    roadWidth,
+    roadLen,
+    mats: {
+      roadMat,
+      vergeMat,
+      curbMat,
+      edgeLineMat,
+      darkMetalMat,
+      poleMat,
+      coneOrangeMat,
+      coneStripeMat,
+      npcTailMat
+    },
+    geos: { coneBaseGeo, coneBodyGeo, coneBandGeo },
+    makeCanvasTexture,
+    addNpcWheels
+  });
+  const wg = hkWorld.groups;
+  const wt = hkWorld.textures;
+
   // ==================== HERO 3D HK 1A PRIVATE CAR ====================
   const carRoot = new THREE.Group();
   const carBodyGroup = new THREE.Group();
@@ -1161,8 +1186,11 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     studsRight.visible = true;
     gantry.visible = true;
     gBoard.visible = true;
+    gantryBoardMat.map = gantrySignTex;
+    gantryBoardMat.needsUpdate = true;
     for (const prop of roadsideProps) prop.visible = true;
     spPoleMat.color.setHex(0x94a3b8);
+    hkWorld.resetAll();
 
     // Reset gantry lane signals to green down arrow
     laneSignalLeftMat.map = laneArrowTex;
@@ -1636,29 +1664,523 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         }
         break;
 
-      case "roadside_sign_3d":
-        // Keep cruising cleanly up to the 3D sign on left pavement before answering (zero spoiler!)
-        if (s === "warn_slippery" || s === "warn_loose_chippings" || s === "warn_narrow_both") {
+      case "roadside_sign_3d": {
+        // Transform the ACTUAL 3D ROAD & ENVIRONMENT to match every single HK road sign in real life!
+        gantry.visible = false;
+        if (s === "warn_dual_end") {
+          // q58: Divided dual carriageway with raised median ending ahead into a two-way road + oncoming car!
+          wg.dualEndGroup.visible = true;
+          wg.oncomingCarGroup.visible = true;
+          wg.oncomingCarGroup.position.set(1.05, 0, -11.5);
+          dashInst.visible = false;
+          studsMid.visible = false;
+          state.scenarioLabel = "實境：分隔車路終止 · 轉雙程路";
+        } else if (s === "warn_narrow_both") {
+          // q102: Road physically narrows inward on BOTH sides ahead!
+          wg.narrowRoadGroup.visible = true;
+          leftCurb.visible = rightCurb.visible = false;
+          curbYellow1.visible = false;
+          dashInst.visible = false;
+          studsLeft.visible = studsMid.visible = studsRight.visible = false;
           state.scenarioSlow = true;
+          state.scenarioLabel = "實境：前方道路兩邊收窄";
+        } else if (s === "passing_place") {
+          // q114: Narrow single-track road + left-side pull-in passing bay + oncoming car!
+          wg.narrowRoadGroup.visible = true;
+          wg.passingPlaceGroup.visible = true;
+          wg.oncomingCarGroup.visible = true;
+          wg.oncomingCarGroup.position.set(0, 0, -13.5);
+          leftCurb.visible = rightCurb.visible = false;
+          curbYellow1.visible = false;
+          dashInst.visible = false;
+          studsLeft.visible = studsMid.visible = studsRight.visible = false;
+          state.targetX = 0;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：狹窄單行路讓車處";
+        } else if (s === "no_through_road") {
+          // q59: Red/white barricade wall sealing off dead-end cul-de-sac ahead!
+          wg.deadEndGroup.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：前方此路不通（掘頭路）";
+        } else if (s === "pass_either_side" || s === "keep_left") {
+          // q53 / q85: Raised concrete pedestrian refuge island + amber bollard in road center!
+          wg.refugeIslandGroup.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          dashInst.visible = false;
+          studsMid.visible = false;
+          state.scenarioLabel = s === "keep_left" ? "實境：安全島 · 靠左駛過" : "實境：安全島 · 左右可通過";
+        } else if (s === "warn_crossroads" || s === "warn_two_way_cross" || s === "give_way" || s === "stop_oct") {
+          // q105 / q57 / q81 / q51: Actual 3D perpendicular cross-street + live cross-traffic cars!
+          wg.crossroadGroup.visible = true;
+          wg.crossCarA.visible = true;
+          wg.crossCarB.visible = s === "warn_two_way_cross" || s === "warn_crossroads";
+          wg.giveWayLine.visible = s === "give_way";
+          if (s === "stop_oct") stopLineMesh.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          leftCurb.visible = rightCurb.visible = false;
+          curbYellow1.visible = false;
+          dashInst.visible = false;
+          state.scenarioSlow = true;
+          state.scenarioLabel =
+            s === "warn_two_way_cross"
+              ? "實境：雙程路橫過單程路口"
+              : s === "give_way"
+                ? "實境：讓路路口 · 橫向車流"
+                : s === "stop_oct"
+                  ? "實境：STOP 停車路口"
+                  : "實境：前面十字路口交匯";
+        } else if (s === "warn_two_way_ahead") {
+          // q116: Oncoming vehicle approaching with white headlights ahead!
+          wg.oncomingCarGroup.visible = true;
+          wg.oncomingCarGroup.position.set(1.05, 0, -10.0);
+          state.scenarioLabel = "實境：前面轉為雙程行車";
+        } else if (s === "one_way") {
+          // q52: One-way urban street with twin forward lane arrows & fellow forward car!
+          wg.roadArrowGroup.visible = true;
+          wg.arrowLeftMat.map = wt.arrowAheadTex;
+          wg.arrowRightMat.map = wt.arrowAheadTex;
+          wg.arrowL.visible = true;
+          wg.arrowR.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          npcCarGroup.visible = true;
+          npcCarGroup.position.set(1.05, 0, -5.2);
+          state.scenarioLabel = "實境：單程行車街道";
+        } else if (s === "turn_left_ahead" || s === "no_left_turn" || s === "ahead_only") {
+          // q86 / q84 / q73: 3D side-road branching left + painted lane arrows!
+          wg.sideRoadGroup.visible = true;
+          wg.roadArrowGroup.visible = true;
+          wg.arrowLeftMat.map = s === "turn_left_ahead" ? wt.arrowLeftTex : wt.arrowAheadTex;
+          wg.arrowL.visible = true;
+          wg.arrowR.visible = false;
+          wg.cityBuildingsGroup.visible = true;
+          leftCurb.visible = false;
+          curbYellow1.visible = false;
+          state.scenarioLabel =
+            s === "turn_left_ahead"
+              ? "實境：前面路口必須左轉"
+              : s === "no_left_turn"
+                ? "實境：前面路口不准左轉"
+                : "實境：前面只准向前駛";
+        } else if (s === "no_u_turn") {
+          // q83: Central divider + forward lane arrow!
+          wg.dualEndGroup.visible = true;
+          wg.roadArrowGroup.visible = true;
+          wg.arrowLeftMat.map = wt.arrowAheadTex;
+          wg.arrowL.visible = true;
+          wg.arrowR.visible = false;
+          wg.cityBuildingsGroup.visible = true;
+          dashInst.visible = false;
+          studsMid.visible = false;
+          state.scenarioLabel = "實境：道路中央禁止掉頭";
+        } else if (s === "no_entry") {
+          // q82: Prohibited entrance with oncoming car emerging + red/white bollards!
+          wg.oncomingCarGroup.visible = true;
+          wg.oncomingCarGroup.position.set(-0.2, 0, -10.5);
+          wg.bollardGateGroup.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：單程出口 · 不准駛入";
+        } else if (s === "height_limit_45" || s === "weight_limit_10t" || s === "no_bicycles") {
+          // q94 / q95 / q93: Real 3D concrete overpass bridge / 4.5m clearance beam!
+          wg.bridgeGroup.visible = true;
+          if (s === "weight_limit_10t") {
+            wg.lorryGroup.visible = true;
+            wg.lorryGroup.position.set(1.05, 0, -7.8);
+          }
+          state.scenarioLabel =
+            s === "height_limit_45"
+              ? "實境：前方限高 4.5 米天橋"
+              : s === "weight_limit_10t"
+                ? "實境：前方限重 10 公噸橋樑"
+                : "實境：天橋入口禁止單車";
+        } else if (s === "cycle_track" || s === "cycle_dismount" || s === "warn_cyclists") {
+          // q89 / q90 / q110: Real 3D bicycle + helmeted cyclist & HK painted cycle track!
+          wg.cyclistGroup.visible = true;
+          if (s === "cycle_track" || s === "cycle_dismount") {
+            wg.cycleTrackMesh.visible = true;
+            wg.cyclistGroup.position.set(-3.35, 0, -4.8);
+          } else {
+            wg.cyclistGroup.position.set(-1.68, 0, -4.6);
+          }
+          state.scenarioSlow = true;
+          state.scenarioLabel = s === "warn_cyclists" ? "實境：前方有騎單車者" : "實境：單車徑與騎單車規則";
+        } else if (s === "warn_camera") {
+          // q77: Iconic HK orange speed / red-light camera pole!
+          wg.speedCameraGroup.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          state.scenarioLabel = "實境：前方偵速／衝紅燈攝影機";
+        } else if (s === "police_stop") {
+          // q87: HK Police patrol car roadblock + cones!
+          wg.policeBlockGroup.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：前方警方路障檢查點";
+        } else if (s === "warn_slippery") {
+          // q112: Glistening wet/slick oil patch right on asphalt!
+          wg.slipperyPatchGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：前方濕滑路面警示";
+        } else if (s === "warn_loose_chippings") {
+          // q113: Scattered 3D grey loose gravel stones across road!
+          wg.gravelPatchGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：前方鬆脫碎石路面";
+        } else if (s === "countdown_green_3" || s === "expressway_start" || s === "expressway_end" || s === "mileage_route9") {
+          // q37 / q32 / q100 / q68: Real 3D branching expressway slip-road + 300/200/100m countdown boards!
+          gantry.visible = true;
+          wg.slipRoadGroup.visible = true;
+          if (s === "expressway_start" || s === "mileage_route9") {
+            wg.threeLaneGroup.visible = true;
+            rightCurb.visible = false;
+            studsRight.visible = false;
+          }
+          state.scenarioLabel =
+            s === "countdown_green_3"
+              ? "實境：快速公路 300 米出口減速線"
+              : s === "mileage_route9"
+                ? "實境：九號幹線里程標誌"
+                : s === "expressway_end"
+                  ? "實境：快速公路終止路段"
+                  : "實境：香港快速公路起點";
+        } else if (s === "no_horn") {
+          // q21: White 3D Hospital building with Red Cross clearly visible beside street!
+          wg.hospitalGroup.visible = true;
+          state.scenarioLabel = "實境：醫院寂靜地帶（禁響號）";
+        } else if (s === "warn_blackspot" || s === "warn_ped_blackspot") {
+          // q56 / q104: Yellow-black HK sharp-bend chevron boards!
+          wg.chevronCurveGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = s === "warn_ped_blackspot" ? "實境：前方行人意外黑點" : "實境：前方交通意外黑點彎位";
+        } else if (s === "warn_traffic_lights") {
+          // q103: Real 3D traffic lights visible further down the urban road!
+          trafficGroup.visible = true;
+          trafficGroup.position.set(0, 0, -4.8);
+          tlRedMat.emissiveIntensity = 0.04;
+          tlAmberMat.emissiveIntensity = 2.4;
+          tlGreenMat.emissiveIntensity = 0.04;
+          wg.cityBuildingsGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：前方交通燈號路口";
+        } else if (s === "speed_limit_50") {
+          // q96: Bold white "50" painted directly on the road asphalt!
+          wg.roadSpeed50Mesh.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          state.scenarioLabel = "實境：時速 50 公里市區限速";
+        } else {
+          // q09 / q54 / q74 / q92 / q97: Restricted-access urban street with red/white bollards!
+          wg.bollardGateGroup.visible = true;
+          wg.cityBuildingsGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：車輛／行人限制管制路段";
         }
-        state.scenarioLabel = "實境：前方香港交通標誌";
         break;
+      }
 
       case "cockpit_safety":
-        if (/停車熄匙|泊車波|P 波|下車/.test(p)) {
+        wg.cityBuildingsGroup.visible = true;
+        gantry.visible = false;
+        if (/視力標準|23 米/.test(p)) {
+          // q01: 23m licence plate eyesight check — parked car directly ahead displaying plate!
+          wg.parkingBayGroup.visible = true;
+          npcCarGroup.visible = true;
+          npcCarGroup.position.set(-1.42, 0, -5.6);
           state.gear = "P";
           state.scenarioStopped = true;
+          state.targetX = -1.42;
+          state.scenarioLabel = "實境：23 米視力測試讀車牌";
+        } else if (/酒精|藥駕|毒駕|呼氣測試/.test(p)) {
+          // q02 / q129: HK Police random breathalyser checkpoint!
+          wg.policeBlockGroup.visible = true;
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：警方路障隨機呼氣測試";
+        } else if (/輪胎|胎紋/.test(p)) {
+          // q04: Parked in bay with close-up side-wheel view!
+          wg.parkingBayGroup.visible = true;
+          state.gear = "P";
+          state.scenarioStopped = true;
+          state.targetX = -1.42;
+          state.scenarioLabel = "實境：輪胎胎紋安全檢查";
+        } else if (/迎頭相撞/.test(p)) {
+          // q207: Oncoming vehicle visual for head-on collision seatbelt physics!
+          wg.oncomingCarGroup.visible = true;
+          wg.oncomingCarGroup.position.set(1.05, 0, -9.5);
+          state.scenarioLabel = "實境：安全帶防撞保護示範";
+        } else if (/停車熄匙|泊車波|P 波|下車/.test(p)) {
+          wg.parkingBayGroup.visible = true;
+          state.gear = "P";
+          state.scenarioStopped = true;
+          state.targetX = -1.42;
           state.scenarioLabel = "實境：自動波 P 波停泊檢查";
         } else if (s === "p_plate" || /暫准駕駛|P 牌/.test(p)) {
-          state.scenarioLabel = "實境：P 牌自動波私家車巡航";
+          gantry.visible = true;
+          wg.cityBuildingsGroup.visible = false;
+          wg.threeLaneGroup.visible = true;
+          rightCurb.visible = false;
+          studsRight.visible = false;
+          state.scenarioLabel = "實境：P 牌自動波快速公路巡航";
         } else {
-          state.scenarioLabel = "實境：1A 自動波安全駕駛";
+          // Seatbelt / child seat / mobile device / driving improvement — parked/urban HK street!
+          wg.parkingBayGroup.visible = /兒童|嬰兒|安全帶|氣袋|輔助駕駛/.test(p);
+          if (wg.parkingBayGroup.visible) {
+            state.gear = "P";
+            state.scenarioStopped = true;
+            state.targetX = -1.42;
+          }
+          state.scenarioLabel = "實境：1A 自動波車廂安全守則";
         }
         break;
 
-      default:
-        state.scenarioLabel = "實境：香港市區道路巡航";
+      default: {
+        // Every remaining city_cruising question gets its own authentic HK real-world street & actor!
+        gantry.visible = false;
+        wg.cityBuildingsGroup.visible = true;
+        if (/電單車/.test(p)) {
+          wg.motorcycleGroup.visible = true;
+          state.scenarioLabel = "實境：香港電單車行車示範";
+        } else if (/的士|輪椅/.test(p)) {
+          wg.taxiGroup.visible = true;
+          state.scenarioLabel = "實境：香港市區的士與無障礙出行";
+        } else if (/拖車/.test(p)) {
+          wg.lorryGroup.visible = true;
+          wg.towGroup.visible = true;
+          wg.lorryGroup.position.set(1.05, 0, -8.8);
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：拖車繩拖曳車輛距離";
+        } else if (/伸懸|貨物|貨車|長車|重型車輛/.test(p)) {
+          wg.lorryGroup.visible = true;
+          wg.lorryFlagGroup.visible = /伸懸|警示裝置/.test(p);
+          if (/高度上限/.test(p)) wg.bridgeGroup.visible = true;
+          state.scenarioLabel = wg.lorryFlagGroup.visible ? "實境：貨車伸懸貨物掛紅旗" : "實境：重型貨車行車與載貨規則";
+        } else if (/單車/.test(p)) {
+          wg.cyclistGroup.visible = true;
+          if (/單車徑|泊車處|推單車|尺碼/.test(p)) {
+            wg.cycleTrackMesh.visible = true;
+            wg.cyclistGroup.position.set(-3.35, 0, -4.8);
+          }
+          if (/停泊車輛/.test(p)) wg.parkedCarsGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：道路單車安全規則";
+        } else if (/動物|騎馬|牽馬|遊行/.test(p)) {
+          wg.animalGroup.visible = true;
+          wg.cityBuildingsGroup.visible = false;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：路旁動物慢駛禮讓";
+        } else if (/停放了車輛|停泊車輛|馬路的一邊.*下車|雙排泊車|不應停留/.test(p)) {
+          wg.parkedCarsGroup.visible = true;
+          state.targetX = 0.45;
+          state.scenarioSlow = true;
+          state.scenarioLabel = /單程路/.test(p) ? "實境：單程路同向停泊車輛" : "實境：路邊停泊車輛與安全空間";
+        } else if (/支路路口/.test(p)) {
+          wg.crossroadGroup.visible = true;
+          wg.giveWayLine.visible = true;
+          leftCurb.visible = rightCurb.visible = false;
+          curbYellow1.visible = false;
+          dashInst.visible = false;
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：支路出大路觀察來車";
+        } else if (/單程路/.test(p)) {
+          wg.roadArrowGroup.visible = true;
+          wg.arrowLeftMat.map = wt.arrowAheadTex;
+          wg.arrowRightMat.map = wt.arrowAheadTex;
+          wg.arrowL.visible = true;
+          wg.arrowR.visible = true;
+          state.scenarioLabel = "實境：香港雙線單程路行車";
+        } else if (/行車時間顯示/.test(p)) {
+          wg.jtiBoardGroup.visible = true;
+          wg.cityBuildingsGroup.visible = false;
+          state.scenarioLabel = "實境：行車時間顯示系統（紅黃綠）";
+        } else if (/危險標記/.test(p)) {
+          wg.hazardPostsGroup.visible = true;
+          wg.cityBuildingsGroup.visible = false;
+          state.scenarioWeather = "night";
+          state.scenarioLabel = "實境：紅白琥珀路邊危險標記";
+        } else if (/四種底色|形狀與顏色/.test(p)) {
+          gantry.visible = true;
+          gantry.position.z = -7.2;
+          gantryBoardMat.map = wt.gantryColorsTex;
+          gantryBoardMat.needsUpdate = true;
+          wg.cityBuildingsGroup.visible = false;
+          state.scenarioLabel = "實境：香港四色方向指示牌";
+        } else if (/文字警告標誌|改道標誌/.test(p)) {
+          gantry.visible = true;
+          gantry.position.z = -7.2;
+          gantryBoardMat.map = wt.gantryTempTex;
+          gantryBoardMat.needsUpdate = true;
+          wg.cityBuildingsGroup.visible = false;
+          state.scenarioLabel = "實境：紅底文字警告與黃底改道牌";
+        } else if (/主要幹線編號/.test(p)) {
+          gantry.visible = true;
+          wg.threeLaneGroup.visible = true;
+          wg.cityBuildingsGroup.visible = false;
+          rightCurb.visible = false;
+          studsRight.visible = false;
+          state.scenarioLabel = "實境：香港主要幹線系統";
+        } else if (/窄路|迂迴/.test(p)) {
+          wg.narrowRoadGroup.visible = true;
+          wg.cityBuildingsGroup.visible = false;
+          leftCurb.visible = rightCurb.visible = false;
+          curbYellow1.visible = false;
+          dashInst.visible = false;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：狹窄迂迴道路禮讓";
+        } else if (/遺下或拋出物件/.test(p)) {
+          wg.obstacleBoxGroup.visible = true;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：路面障礙物清除與警告";
+        } else if (/70 km\/h 進入 50 km\/h|速度計/.test(p)) {
+          wg.roadSpeed50Mesh.visible = true;
+          wg.slipRoadGroup.visible = true;
+          wg.cityBuildingsGroup.visible = false;
+          state.scenarioLabel = "實境：高速轉入 50 km/h 減速";
+        } else if (/安全檢查及加油|疲倦|鞋履|上車前|開車前|幼童|執照|年齡|載客|儀錶板|記分|服食藥物|學牌/.test(p)) {
+          wg.parkingBayGroup.visible = true;
+          state.gear = "P";
+          state.scenarioStopped = true;
+          state.targetX = -1.42;
+          state.scenarioLabel = "實境：開車前安全檢查與法例";
+        } else {
+          state.scenarioLabel = "實境：香港市區街道行車";
+        }
         break;
+      }
+    }
+
+    // ==================== ENHANCE EXISTING SCENARIOS WITH REAL-WORLD ROAD DETAILS ====================
+    if (kind === "weather_night_rain") {
+      if (/迎面車輛開高燈|目眩/.test(p)) {
+        wg.oncomingCarGroup.visible = true;
+        wg.oncomingCarGroup.position.set(1.05, 0, -9.2);
+        if (wg.oncomingGlare) wg.oncomingGlare.visible = true;
+        state.scenarioLabel = "實境：夜間迎面高燈目眩";
+      } else if (/水浸|積水/.test(p)) {
+        wg.floodWaterMesh.visible = true;
+        state.scenarioLabel = "實境：水浸積水街道慢駛";
+      } else if (/滑溜|剛落雨/.test(p)) {
+        wg.slipperyPatchGroup.visible = true;
+      } else if (s === "wind_affected" || /強風|熱帶氣旋/.test(p)) {
+        wg.lorryGroup.visible = true;
+        wg.lorryGroup.position.set(1.05, 0, -7.2);
+      }
+    }
+    if (kind === "highway_overtake") {
+      if (/三條行車線|禁止使用最右線|純電動車|港珠澳/.test(p)) {
+        wg.threeLaneGroup.visible = true;
+        rightCurb.visible = false;
+        studsRight.visible = false;
+      } else if (/加速行車線|500 米|錯過/.test(p)) {
+        wg.slipRoadGroup.visible = true;
+      } else if (/不應超車|彎路|坡頂/.test(p)) {
+        wg.chevronCurveGroup.visible = true;
+        gantry.visible = false;
+      } else if (/的士|小巴/.test(p)) {
+        npcCarGroup.visible = false;
+        wg.taxiGroup.visible = true;
+        wg.cityBuildingsGroup.visible = true;
+        gantry.visible = false;
+      } else if (/超越停泊/.test(p)) {
+        npcCarGroup.visible = false;
+        wg.parkedCarsGroup.visible = true;
+        wg.oncomingCarGroup.visible = true;
+        wg.oncomingCarGroup.position.set(1.05, 0, -11.5);
+        wg.cityBuildingsGroup.visible = true;
+        gantry.visible = false;
+      } else if (/窄路.*迎面/.test(p)) {
+        npcCarGroup.visible = false;
+        wg.narrowRoadGroup.visible = true;
+        wg.oncomingCarGroup.visible = true;
+        wg.oncomingCarGroup.position.set(0, 0, -13.0);
+        leftCurb.visible = rightCurb.visible = false;
+        curbYellow1.visible = false;
+        dashInst.visible = false;
+        gantry.visible = false;
+      } else if (/小路出大路/.test(p)) {
+        npcCarGroup.visible = false;
+        wg.crossroadGroup.visible = true;
+        wg.giveWayLine.visible = true;
+        leftCurb.visible = rightCurb.visible = false;
+        curbYellow1.visible = false;
+        dashInst.visible = false;
+        gantry.visible = false;
+      } else if (/預設最高車速|50 公里/.test(p) && !/停車距離/.test(p)) {
+        npcCarGroup.visible = false;
+        wg.roadSpeed50Mesh.visible = true;
+        wg.cityBuildingsGroup.visible = true;
+        gantry.visible = false;
+      } else if (s === "long_vehicle_plate") {
+        busGroup.visible = false;
+        wg.lorryGroup.visible = true;
+        wg.lorryGroup.position.set(-1.05, 0, -7.2);
+      }
+    }
+    if (kind === "road_markings_white") {
+      if (/白色斜線|人字形/.test(p)) {
+        wg.chevronHatchMesh.visible = true;
+        dashInst.visible = false;
+        studsMid.visible = false;
+        gantry.visible = false;
+        state.scenarioLabel = "實境：白色斜線／人字形禁區標記";
+      }
+    }
+    if (kind === "roundabout") {
+      if (/黃色橫條/.test(p)) {
+        wg.yellowBarsGroup.visible = true;
+        state.scenarioLabel = "實境：迴旋處前黃色橫條減速標記";
+      } else if (/騎單車/.test(p)) {
+        wg.cyclistGroup.visible = true;
+        wg.cyclistGroup.position.set(-1.6, 0, -3.4);
+        state.scenarioLabel = "實境：單車靠左外圈行迴旋處";
+      }
+    }
+    if (kind === "tunnel_overhead") {
+      if (/東.*中.*西/.test(p)) {
+        tunnelGroup.visible = false;
+        gBoard.visible = true;
+        gantry.position.z = -7.2;
+        gantryBoardMat.map = wt.gantryHarbourTex;
+        gantryBoardMat.needsUpdate = true;
+        state.scenarioWeather = "clear";
+        for (const prop of roadsideProps) prop.visible = true;
+        state.scenarioLabel = "實境：東／中／西三條過海隧道標誌";
+      } else if (/跌下貨物|漏出/.test(p)) {
+        wg.obstacleBoxGroup.visible = true;
+      }
+    }
+    if (kind === "maneuver_signal") {
+      if (/警務人員|交通督導員/.test(p)) {
+        wg.policeBlockGroup.visible = true;
+        wg.cityBuildingsGroup.visible = true;
+        gantry.visible = false;
+      } else if (/路口.*轉右|路口.*轉左/.test(p)) {
+        wg.crossroadGroup.visible = true;
+        wg.cityBuildingsGroup.visible = true;
+        leftCurb.visible = rightCurb.visible = false;
+        curbYellow1.visible = false;
+        dashInst.visible = false;
+        gantry.visible = false;
+      } else if (/騎單車/.test(p)) {
+        wg.cyclistGroup.visible = true;
+        wg.cityBuildingsGroup.visible = true;
+        gantry.visible = false;
+      }
+    }
+    if (kind === "bus_lane" && /騎單車/.test(p)) {
+      wg.cyclistGroup.visible = true;
+      wg.cyclistGroup.position.set(-1.72, 0, -3.5);
+    }
+    if (
+      kind === "traffic_red_amber" ||
+      kind === "traffic_green_arrow" ||
+      kind === "traffic_wigwag" ||
+      kind === "traffic_light_general" ||
+      kind === "pedestrian_zebra" ||
+      kind === "yellow_box_rail" ||
+      kind === "parking_curb" ||
+      kind === "bus_lane"
+    ) {
+      wg.cityBuildingsGroup.visible = true;
     }
 
     // Hide expressway overhead gantry on city crossings, intersections & slope parking for HK realism!
@@ -1669,11 +2191,13 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       kind === "traffic_wigwag" ||
       kind === "traffic_light_general" ||
       kind === "yellow_box_rail" ||
+      kind === "parking_curb" ||
+      kind === "bus_lane" ||
       (kind === "slope_hill" && state.scenarioStopped)
     ) {
       gantry.visible = false;
     }
-    if (kind === "slope_hill" && state.scenarioStopped) {
+    if ((kind === "slope_hill" && state.scenarioStopped) || wg.crossroadGroup.visible || wg.narrowRoadGroup.visible) {
       for (const prop of roadsideProps) prop.visible = false;
     }
 
@@ -1818,8 +2342,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   // ==================== MOUNTING & CAMERA MODES ====================
   function snapQuizCameraForScenario() {
     if (state.mode !== "quiz") return;
-    if (state.scenario === "slope_hill" && state.scenarioStopped) {
-      // Low side-kerb close-up angled along front-left wheel & kerb so wheel turn right/left + slope tilt are unmistakable!
+    if ((state.scenario === "slope_hill" && state.scenarioStopped) || /輪胎胎紋|胎紋/.test(state.activeQuestion?.prompt || "")) {
+      // Low side-kerb close-up angled along front-left wheel & kerb so wheel turn right/left + slope tilt + tire are unmistakable!
       camera.position.set(-3.05, 1.12, 1.55);
       controls.target.set(-1.35, 0.34, -0.55);
     } else {
@@ -2033,6 +2557,23 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         state.scenarioSlow = true;
         state.brakeTimer = 2.2;
         state.scenarioLabel = "實境：讓路標誌 · 減速準備讓路";
+      } else if (kind === "roadside_sign_3d" && s === "passing_place") {
+        state.targetX = -1.85;
+        state.blinkerDir = -1;
+        state.blinkerTimer = 2.0;
+        state.scenarioStopped = true;
+        state.brakeTimer = 99;
+        state.scenarioLabel = "實境：駛入左邊讓車處暫停禮讓";
+      } else if (kind === "roadside_sign_3d" && s === "turn_left_ahead") {
+        state.blinkerDir = -1;
+        state.blinkerTimer = 2.0;
+        state.targetCarYaw = 0.2;
+        state.targetX = -1.35;
+        state.scenarioSlow = true;
+        state.scenarioLabel = "實境：依指示前面路口左轉";
+      } else if (wg.policeBlockGroup.visible || wg.deadEndGroup.visible || wg.bollardGateGroup.visible || wg.parkingBayGroup.visible) {
+        state.scenarioStopped = true;
+        state.brakeTimer = 99;
       } else if (kind === "highway_overtake") {
         if (state.scenarioCanOvertake) {
           state.lane = "right";
@@ -2287,6 +2828,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     if (doubleWhiteGroup.visible && dwLeftBroken.visible) {
       dwLeftBroken.position.z = ((state.roadOffset % 2.1) + 2.1) % 2.1;
     }
+
+    // Animate modular real-world HK 3D road actors & dynamic scrolling structures
+    hkWorld.animate(dt, elapsed, { roadSpeed: state.roadSpeed });
 
     // Animate scenario-specific dynamic props
     if (state.scenarioAmberGantry) {
