@@ -532,6 +532,7 @@ import { createHongKongWorldProps } from "./world3d.js";
   // 3. 3D Zebra Crossing + Glowing Belisha Beacons + Animated Pedestrian
   const zebraGroup = new THREE.Group();
   zebraGroup.visible = false;
+  const zebraDecorGroup = new THREE.Group();
   const zebraMat = new THREE.MeshStandardMaterial({ map: zebraTex, roughness: 0.85 });
   const zebraRoad = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth - 0.4, 1.55), zebraMat);
   zebraRoad.rotation.x = -Math.PI / 2;
@@ -545,10 +546,11 @@ import { createHongKongWorldProps } from "./world3d.js";
     bp.position.set(bx, 0.92, -3.15);
     const globe = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 12), beaconGlowMat);
     globe.position.set(bx, 1.94, -3.15);
-    zebraGroup.add(bp, globe);
+    zebraDecorGroup.add(bp, globe);
   });
+  zebraDecorGroup.add(zebraRoad);
 
-  // Stylized 3D Pedestrian walking across zebra
+  // Stylized 3D Pedestrian walking across zebra or Green-Man crossing
   const pedGroup = new THREE.Group();
   const pedBody = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.14, 0.36, 6, 10),
@@ -564,7 +566,7 @@ import { createHongKongWorldProps } from "./world3d.js";
   pedHead.castShadow = true;
   pedGroup.add(pedBody, pedHead);
   pedGroup.position.set(-1.3, 0, -3.15);
-  zebraGroup.add(zebraRoad, pedGroup);
+  zebraGroup.add(zebraDecorGroup, pedGroup);
   scenarioRoot.add(zebraGroup);
 
   // 4. 3D Yellow Box Junction + Tram/LRT Rails
@@ -737,12 +739,17 @@ import { createHongKongWorldProps } from "./world3d.js";
   [-0.4, 0.4].forEach((tx) => {
     const tl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.11, 0.05), npcTailMat);
     tl.position.set(tx, 0.46, 1.82);
-    busGroup.add(tl);
+    const hl = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.12, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfffbeb, emissiveIntensity: 2.2 })
+    );
+    hl.position.set(tx, 0.46, -1.82);
+    busGroup.add(tl, hl);
   });
   busGroup.position.set(-1.05, 0, -5.8);
   scenarioRoot.add(busGroup);
 
-  // 9. 3D NPC Lead Vehicle (grounded with wheels + tail lights!)
+  // 9. 3D NPC Lead Vehicle (grounded with wheels, tail lights, right blinker & animated 3D Driver Hand-Signal Arm!)
   const npcCarGroup = new THREE.Group();
   npcCarGroup.visible = false;
   const npcBody = new THREE.Mesh(
@@ -761,7 +768,29 @@ import { createHongKongWorldProps } from "./world3d.js";
     tl.position.set(tx, 0.42, 1.04);
     npcCarGroup.add(tl);
   });
-  npcCarGroup.add(npcBody, npcCabin);
+  const npcRightBlinkerMat = new THREE.MeshStandardMaterial({
+    color: 0xd97706, emissive: 0xf59e0b, emissiveIntensity: 0.08, roughness: 0.25
+  });
+  const npcBlinkRR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.05), npcRightBlinkerMat);
+  npcBlinkRR.position.set(0.46, 0.42, 1.045);
+  const npcBlinkFR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.05), npcRightBlinkerMat);
+  npcBlinkFR.position.set(0.46, 0.4, -1.035);
+  // 3D Driver Right Arm extending out HK right-hand-drive window for hand-signal questions (q64/q76/q115!)
+  const driverArmPivot = new THREE.Group();
+  driverArmPivot.visible = false;
+  driverArmPivot.position.set(0.46, 0.68, -0.02);
+  const armSleeve = new THREE.Mesh(
+    new THREE.BoxGeometry(0.56, 0.13, 0.13),
+    new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x9a3412, emissiveIntensity: 0.35, roughness: 0.45 })
+  );
+  armSleeve.position.set(0.28, 0, 0);
+  const armHand = new THREE.Mesh(
+    new THREE.BoxGeometry(0.22, 0.11, 0.15),
+    new THREE.MeshStandardMaterial({ color: 0xfdba74, emissive: 0x7c2d12, emissiveIntensity: 0.2, roughness: 0.5 })
+  );
+  armHand.position.set(0.66, 0, 0);
+  driverArmPivot.add(armSleeve, armHand);
+  npcCarGroup.add(npcBody, npcCabin, npcBlinkRR, npcBlinkFR, driverArmPivot);
   addNpcWheels(npcCarGroup, 0.5, [-0.64, 0.64]);
   npcCarGroup.position.set(-1.05, 0, -4.6);
   scenarioRoot.add(npcCarGroup);
@@ -1161,7 +1190,9 @@ import { createHongKongWorldProps } from "./world3d.js";
     signPostGroup.position.set(-3.12, 0, -6.8);
     signPostGroup.rotation.y = 0.14;
     zebraGroup.visible = false;
+    zebraDecorGroup.visible = true;
     yellowBoxGroup.visible = false;
+    ybMesh.visible = true;
     doubleWhiteGroup.visible = false;
     dwLeftBroken.position.z = 0;
     roadworksGroup.visible = false;
@@ -1170,8 +1201,13 @@ import { createHongKongWorldProps } from "./world3d.js";
     ambGroup.position.set(1.05, 0, 1.8);
     warningTriangleGroup.visible = false;
     busGroup.visible = false;
+    busGroup.rotation.y = 0;
+    busGroup.position.set(-1.05, 0, -5.8);
     npcCarGroup.visible = false;
     npcCarGroup.position.set(-1.05, 0, -4.6);
+    driverArmPivot.visible = false;
+    driverArmPivot.rotation.set(0, 0, 0);
+    npcRightBlinkerMat.emissiveIntensity = 0.08;
     roundaboutGroup.visible = false;
     roundaboutGroup.position.set(0, 0, 0);
     tunnelGroup.visible = false;
@@ -1210,7 +1246,15 @@ import { createHongKongWorldProps } from "./world3d.js";
     state.scenarioAmberGantry = false;
     state.scenarioBrakeDemo = false;
     state.scenarioPedSlow = false;
+    state.scenarioContraflowBus = false;
+    state.scenarioArmSignal = null;
+    state.scenarioNpcRightBlink = false;
+    state.scenarioGreenManFlash = false;
+    state.scenarioAbortOvertake = false;
+    state.scenarioPassLeft = false;
+    state.scenarioNpcTargetZ = -4.8;
     state.scenarioOutcome = null;
+    state.scenarioRevealLabel = "";
     state.targetCarYaw = 0;
     state.targetZ = 0.25;
     state.targetX = state.lane === "left" ? LEFT_LANE_X : RIGHT_LANE_X;
@@ -1218,6 +1262,18 @@ import { createHongKongWorldProps } from "./world3d.js";
     state.blinkerTimer = 0;
     state.brakeTimer = 0;
   }
+
+  // Purely abstract law/number/first-aid/cabin/licensing questions that do NOT depict a road scene:
+  // Smartly hide the 3D road stage on these questions so 100% of shown 3D scenes genuinely match the question!
+  const HIDE_3D_IDS = new Set([
+    "q01","q02","q04","q05","q06","q07","q10","q11","q12","q14","q17",
+    "q45","q46","q71","q72",
+    "q122","q123","q124","q125","q126","q127","q128","q129","q130","q131","q132","q133",
+    "q149","q159","q160","q164","q167","q168","q171","q172","q178","q179","q186","q187","q188",
+    "q195","q197","q200","q201","q205","q206","q207","q208","q209","q210","q211","q212","q213","q214","q215","q216",
+    "q230","q231","q232","q233","q246","q256","q257","q266","q267","q268","q270","q272","q273",
+    "q286","q287","q288","q290","q291","q292","q297","q298"
+  ]);
 
   // Non-roadside illustrations (vehicle plates, road-surface markings, signal diagrams, multi-pole charts)
   const NON_ROADSIDE_SIGNS = new Set([
@@ -1494,15 +1550,28 @@ import { createHongKongWorldProps } from "./world3d.js";
         state.scenarioLabel = "實境：香港兩線迴旋處";
         break;
 
-      case "yellow_box_rail":
+      case "yellow_box_rail": {
+        const isActualYellowBox = /黃色方格|黃色交叉方格|黃格/.test(p) || s.includes("yellow_box");
+        const isTramOrLrt = /電車|輕鐵|路軌/.test(p) || s === "lrt_tram_only" || s === "warn_lrt_tram" || s === "tram_stop_mark";
         yellowBoxGroup.visible = true;
+        ybMesh.visible = isActualYellowBox;
+        railGroup.visible = isTramOrLrt;
         dashInst.visible = false;
         studsMid.visible = false;
-        railGroup.visible = /電車|輕鐵|路軌/.test(p) || s === "lrt_tram_only" || s === "warn_lrt_tram" || s === "tram_stop_mark";
-        state.scenarioStopped = true;
-        state.brakeTimer = 99;
-        state.scenarioLabel = railGroup.visible ? "實境：電車／輕鐵黃格路口" : "實境：黃色方格路口";
+        if (isTramOrLrt && !isActualYellowBox) {
+          // q121 / q277 / q280 / q91 / q109: Authentic HK Green Double-Decker Tram on rails + yellow stop line (NO fake yellow box!)
+          wg.hkTramGroup.visible = true;
+          wg.yellowStopLineMesh.visible = s === "tram_stop_mark" || /黃色停車線/.test(p);
+          state.scenarioStopped = wg.yellowStopLineMesh.visible || /電車站/.test(p);
+          if (state.scenarioStopped) state.brakeTimer = 99;
+          state.scenarioLabel = wg.yellowStopLineMesh.visible ? "實境：電車站黃色停車線" : "實境：香港電車／輕鐵專線";
+        } else {
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = isTramOrLrt ? "實境：電車／輕鐵黃格路口" : "實境：黃色方格路口";
+        }
         break;
+      }
 
       case "road_markings_white":
         if (/雙白線/.test(p) || s.includes("double_white")) {
@@ -1513,6 +1582,12 @@ import { createHongKongWorldProps } from "./world3d.js";
           dwLeftSolid.visible = !brokenOnYourSide;
           dwLeftBroken.visible = brokenOnYourSide;
           state.scenarioLabel = brokenOnYourSide ? "實境：靠你一邊虛雙白線" : "實境：連續雙白實線";
+        } else if (s === "road_white_lines" || /三種白色單行虛線/.test(p)) {
+          // q25: Three distinct white dashed line patterns side-by-side (short / medium / long-warning)!
+          wg.threeWhiteLinesGroup.visible = true;
+          dashInst.visible = false;
+          studsMid.visible = false;
+          state.scenarioLabel = "實境：三種白色單行虛線（最右為警告線）";
         } else if (/反光路釘/.test(p)) {
           state.scenarioWeather = "night";
           state.scenarioLabel = "實境：紅白琥珀反光路釘";
@@ -1522,32 +1597,77 @@ import { createHongKongWorldProps } from "./world3d.js";
         break;
 
       case "parking_curb":
-        curbYellow2.visible = true;
-        if (/紅杆/.test(p)) spPoleMat.color.setHex(0xdc2626);
-        else if (/綠杆/.test(p)) spPoleMat.color.setHex(0x059669);
-        else if (/黃杆/.test(p)) spPoleMat.color.setHex(0xeab308);
-        state.targetX = LEFT_LANE_X;
-        state.scenarioLabel = "實境：路旁禁區黃線與泊車規則";
+        if (/快速公路.*並不會設置|為何「快速公路」/.test(p)) {
+          // q234: Expressway legally forbids stopping WITHOUT yellow lines — show ZERO yellow lines on 3-lane expressway!
+          curbYellow1.visible = false;
+          curbYellow2.visible = false;
+          wg.threeLaneGroup.visible = true;
+          rightCurb.visible = false;
+          studsRight.visible = false;
+          gantry.visible = true;
+          state.scenarioLabel = "實境：快速公路（不設黃線即禁停車）";
+        } else if (s === "road_yellow_lines" || /單行黃色虛線/.test(p)) {
+          // q44: Actual single dashed yellow line along left curb (NOT double solid yellow)!
+          curbYellow1.visible = false;
+          curbYellow2.visible = false;
+          wg.curbYellowDashedGroup.visible = true;
+          state.scenarioLabel = "實境：路旁單行黃色虛線";
+        } else if (/紅杆|綠杆|顏色標誌杆|黃色杆/.test(p) || s === "pole_colors") {
+          // q43 / q117: Authentic HK colored restriction poles standing along left curb!
+          curbYellow2.visible = true;
+          wg.coloredPolesGroup.visible = true;
+          if (/紅杆/.test(p)) {
+            wg.poleRed.visible = true;
+            wg.poleGreen.visible = true;
+            state.scenarioLabel = "實境：紅杆／綠杆不准停車限制區";
+          } else {
+            wg.poleYellow.visible = true;
+            wg.poleGrey.visible = true;
+            state.scenarioLabel = "實境：黃杆／灰杆不准停車限制區";
+          }
+        } else {
+          curbYellow2.visible = true;
+          state.targetX = LEFT_LANE_X;
+          state.scenarioLabel = "實境：路旁禁區黃線與泊車規則";
+        }
         break;
 
       case "bus_lane":
         busGroup.visible = true;
         state.lane = "right";
         state.targetX = RIGHT_LANE_X;
-        state.scenarioLabel = /車速/.test(p) ? "實境：大型巴士與貨車限速" : "實境：香港巴士專線旁行車";
+        if (s === "contraflow_bus" || /反向行駛巴士線/.test(p)) {
+          // q30: Contraflow bus lane — HK double-decker bus approaches TOWARD you with white headlights!
+          busGroup.rotation.y = Math.PI;
+          busGroup.position.set(-1.05, 0, -11.5);
+          state.scenarioContraflowBus = true;
+          state.scenarioLabel = "實境：對面反向行駛巴士線";
+        } else {
+          state.scenarioLabel = "實境：香港巴士專線旁行車";
+        }
         break;
 
       case "pedestrian_zebra": {
         zebraGroup.visible = true;
+        const isGreenManCrossing = /綠色人像/.test(p);
         const isGreenWithElderly = /綠燈剛亮起|長者/.test(p);
-        if (isGreenWithElderly) {
-          trafficGroup.visible = true;
-          stopLineMesh.visible = true;
-          tlRedMat.emissiveIntensity = 0.04;
-          tlAmberMat.emissiveIntensity = 0.04;
-          tlGreenMat.emissiveIntensity = 2.4;
-          state.scenarioPedSlow = true;
-          state.scenarioLabel = "實境：綠燈仍須讓行人先過";
+        if (isGreenManCrossing) {
+          // q65 / q154 / q163 / q196: Real HK Green-Man Pedestrian Signal Crossing (NOT zebra Belisha beacons!)
+          zebraDecorGroup.visible = false;
+          wg.greenManGroup.visible = true;
+          state.scenarioGreenManFlash = /閃動|發聲裝置/.test(p);
+          if (isGreenWithElderly) {
+            trafficGroup.visible = true;
+            trafficGroup.position.set(0, 0, -1.35);
+            stopLineMesh.visible = true;
+            tlRedMat.emissiveIntensity = 0.04;
+            tlAmberMat.emissiveIntensity = 0.04;
+            tlGreenMat.emissiveIntensity = 2.4;
+            state.scenarioPedSlow = true;
+            state.scenarioLabel = "實境：綠燈仍須讓行人先過";
+          } else {
+            state.scenarioLabel = state.scenarioGreenManFlash ? "實境：綠色人像閃動過路處" : "實境：綠色人像過路處";
+          }
         } else if (/反光物料|漆黑/.test(p)) {
           state.scenarioWeather = "night";
           state.scenarioLabel = "實境：夜間行人反光過路";
@@ -1593,6 +1713,15 @@ import { createHongKongWorldProps } from "./world3d.js";
           rainInst.visible = !/強風|熱帶氣旋/.test(p) || /雨/.test(p);
           state.scenarioWeather = "rain";
           state.scenarioSlow = true;
+          if (/停車距離|四秒|兩秒/.test(p)) {
+            // q16 / q18: Wet stopping distance / 4-second rule with DOUBLED red braking zone!
+            wg.stoppingZonesGroup.visible = true;
+            wg.brakingStrip.scale.y = 1.75;
+            wg.brakingStrip.position.z = -5.7;
+            npcCarGroup.visible = true;
+            npcCarGroup.position.set(-1.05, 0, -9.5);
+            state.scenarioNpcTargetZ = -9.5;
+          }
           state.scenarioLabel = /強風|熱帶氣旋/.test(p) ? "實境：強風大雨橫風警覺" : "實境：雨天濕滑路面行車";
         } else if (/霧|能見度/.test(p)) {
           state.scenarioWeather = "fog";
@@ -1611,18 +1740,46 @@ import { createHongKongWorldProps } from "./world3d.js";
           s === "stopping_buses" ||
           s === "stopping_distance_chart" ||
           s === "long_vehicle_plate" ||
-          /不應超車|不准超車|不可超車|讓路|停車距離|兩秒|跟車|減慢|切勿.*換線|禁止使用最右線|錯過|最高車速|速度計|三條行車線|純電動車|500 米|港珠澳|的士或公共小型巴士|加速行車線/.test(p);
+          /不應超車|不准超車|不可超車|讓路|停車距離|兩秒|跟車|減慢|切勿.*換線|禁止使用最右線|錯過|最高車速|速度計|三條行車線|純電動車|500 米|港珠澳|靠右駛道路|的士或公共小型巴士|加速行車線|折返/.test(p);
         state.scenarioCanOvertake = !noOvertakeRule;
-        if (s === "long_vehicle_plate") {
+        if (/港珠澳|靠右駛道路/.test(p)) {
+          // q244: HZMB Hong Kong Link Road right-hand traffic — car genuinely drives on RIGHT (no answer spoiler)!
+          npcCarGroup.visible = false;
+          state.lane = "right";
+          state.targetX = RIGHT_LANE_X;
+          state.scenarioLabel = "實境：快速公路靠右駛道路示範";
+        } else if (/左方超車/.test(p)) {
+          // q19: Lead car in right/center with RIGHT BLINKER flashing -> pass cleanly on the LEFT!
+          npcCarGroup.position.set(0.55, 0, -4.6);
+          state.scenarioNpcRightBlink = true;
+          state.scenarioPassLeft = true;
+          state.scenarioCanOvertake = false;
+          state.scenarioLabel = "實境：前車打右燈準備轉右";
+        } else if (/前車突然加速/.test(p)) {
+          // q135: Start alongside in right lane; on right answer safely abort overtake back to left lane!
+          state.lane = "right";
+          state.targetX = RIGHT_LANE_X;
+          npcCarGroup.position.set(-1.05, 0, -2.1);
+          state.scenarioNpcTargetZ = -2.1;
+          state.scenarioAbortOvertake = true;
+          state.scenarioCanOvertake = false;
+          state.scenarioLabel = "實境：超車遇前車加速 · 折返原線";
+        } else if (s === "long_vehicle_plate") {
           npcCarGroup.visible = false;
           busGroup.visible = true;
           busGroup.position.set(-1.05, 0, -5.8);
           state.scenarioLabel = "實境：長車前方盲點與距離";
-        } else if (/停車距離|兩秒|跟車|的士|切入/.test(p)) {
+        } else if (/停車距離|兩秒|跟車/.test(p)) {
+          // q15 / q118 / q134: Show Thinking Distance (Amber) + Braking Distance (Red) strips ahead!
+          wg.stoppingZonesGroup.visible = true;
+          npcCarGroup.position.set(-1.05, 0, -7.2);
+          state.scenarioNpcTargetZ = -7.2;
+          state.scenarioLabel = "實境：思考＋剎車安全距離示範";
+        } else if (/的士|切入/.test(p)) {
           state.scenarioLabel = "實境：跟車安全距離示範";
         } else if (s === "no_overtaking" || /不應超車/.test(p)) {
           state.scenarioLabel = "實境：禁超車路段保持跟車";
-        } else if (/禁止使用最右線|三條行車線|500 米|錯過|速度計|最高車速|純電動車|加速行車線|港珠澳/.test(p)) {
+        } else if (/禁止使用最右線|三條行車線|500 米|錯過|速度計|最高車速|純電動車|加速行車線/.test(p)) {
           state.scenarioLabel = "實境：香港快速公路行車規則";
         } else {
           state.scenarioLabel = "實境：超車與切線判斷";
@@ -1631,7 +1788,33 @@ import { createHongKongWorldProps } from "./world3d.js";
       }
 
       case "maneuver_signal":
-        if (/剎車燈|停車燈/.test(p)) {
+        if (/騎單車/.test(p) && /手號/.test(p)) {
+          // q202: Cyclist hand signal question — show cyclist cleanly (anti-spoiler pre-answer!)
+          wg.cyclistGroup.visible = true;
+          wg.cyclistGroup.position.set(-1.45, 0, -4.0);
+          wg.cityBuildingsGroup.visible = true;
+          gantry.visible = false;
+          state.scenarioSlow = true;
+          state.scenarioLabel = "實境：騎單車者慢駛／停車手號";
+        } else if (s.startsWith("hand_signal") || /手號|逆時針打圈|掌心向下|平舉指向右/.test(p)) {
+          // q64 / q76 / q115: Lead car extends BOLD 3D RIGHT ARM doing exact HK hand signal!
+          npcCarGroup.visible = true;
+          npcCarGroup.position.set(-1.32, 0, -3.1);
+          state.scenarioNpcTargetZ = -3.1;
+          state.targetX = -0.82;
+          driverArmPivot.visible = true;
+          if (s === "hand_signal_left" || /逆時針/.test(p)) {
+            state.scenarioArmSignal = "left_circle";
+            state.scenarioLabel = "實境：前車右臂逆時針打圈（轉左）";
+          } else if (s === "hand_signal_right" || /平舉指向右/.test(p)) {
+            state.scenarioArmSignal = "right_point";
+            state.scenarioLabel = "實境：前車右臂平舉（轉右／駛出）";
+          } else {
+            state.scenarioArmSignal = "slow_wave";
+            state.scenarioSlow = true;
+            state.scenarioLabel = "實境：前車右臂上下擺動（慢駛／停車）";
+          }
+        } else if (/剎車燈|停車燈/.test(p)) {
           state.scenarioWeather = "night";
           state.scenarioBrakeDemo = true;
           state.scenarioLabel = "實境：車尾後燈與剎車燈分別";
@@ -1645,10 +1828,10 @@ import { createHongKongWorldProps } from "./world3d.js";
           state.scenarioStopped = true;
           state.brakeTimer = 99;
           state.scenarioLabel = "實境：遵從警員交通指揮";
-        } else if (/轉左|逆時針/.test(p) && !/轉右/.test(p)) {
+        } else if (/轉左/.test(p) && !/轉右/.test(p)) {
           state.blinkerDir = -1;
           state.blinkerTimer = 8;
-          state.scenarioLabel = "實境：左轉信號與手號";
+          state.scenarioLabel = "實境：左轉信號與路口";
         } else if (/轉右/.test(p) && !/轉左/.test(p)) {
           state.blinkerDir = 1;
           state.blinkerTimer = 8;
@@ -1656,7 +1839,7 @@ import { createHongKongWorldProps } from "./world3d.js";
         } else if (/慢駛|減速/.test(p)) {
           state.scenarioSlow = true;
           state.brakeTimer = 2.5;
-          state.scenarioLabel = "實境：慢駛停車手號與信號";
+          state.scenarioLabel = "實境：慢駛停車信號";
         } else {
           state.blinkerDir = -1;
           state.blinkerTimer = 6;
@@ -2067,7 +2250,7 @@ import { createHongKongWorldProps } from "./world3d.js";
       }
     }
     if (kind === "highway_overtake") {
-      if (/三條行車線|禁止使用最右線|純電動車|港珠澳/.test(p)) {
+      if (/三條行車線|禁止使用最右線|純電動車|港珠澳|靠右駛道路/.test(p)) {
         wg.threeLaneGroup.visible = true;
         rightCurb.visible = false;
         studsRight.visible = false;
@@ -2147,6 +2330,11 @@ import { createHongKongWorldProps } from "./world3d.js";
         state.scenarioLabel = "實境：東／中／西三條過海隧道標誌";
       } else if (/跌下貨物|漏出/.test(p)) {
         wg.obstacleBoxGroup.visible = true;
+      } else if (/單管雙程/.test(p)) {
+        // q161: Single-tube two-way tunnel with oncoming car in opposite lane!
+        wg.oncomingCarGroup.visible = true;
+        wg.oncomingCarGroup.position.set(1.05, 0, -11.0);
+        state.scenarioLabel = "實境：單管雙程行車隧道";
       }
     }
     if (kind === "maneuver_signal") {
@@ -2178,7 +2366,7 @@ import { createHongKongWorldProps } from "./world3d.js";
       kind === "traffic_light_general" ||
       kind === "pedestrian_zebra" ||
       kind === "yellow_box_rail" ||
-      kind === "parking_curb" ||
+      (kind === "parking_curb" && !wg.threeLaneGroup.visible) ||
       kind === "bus_lane"
     ) {
       wg.cityBuildingsGroup.visible = true;
@@ -2192,7 +2380,7 @@ import { createHongKongWorldProps } from "./world3d.js";
       kind === "traffic_wigwag" ||
       kind === "traffic_light_general" ||
       kind === "yellow_box_rail" ||
-      kind === "parking_curb" ||
+      (kind === "parking_curb" && !wg.threeLaneGroup.visible) ||
       kind === "bus_lane" ||
       (kind === "slope_hill" && state.scenarioStopped)
     ) {
@@ -2224,8 +2412,8 @@ import { createHongKongWorldProps } from "./world3d.js";
     // specific HK scenario label right AFTER answering to reinforce learning!
     state.scenarioRevealLabel = state.scenarioLabel;
     const asksMeaning =
-      /代表甚麼|表示甚麼|甚麼意思|有何意思|甚麼指令|甚麼限制|甚麼情況|甚麼設施|甚麼危險|有何分別|哪一條是|各自代表/.test(p) &&
-      (Boolean(s) || /反光路釘|危險標記|四種底色|行車時間顯示|東.*中.*西|黃色橫條|文字警告/.test(p));
+      /代表甚麼|表示甚麼|甚麼意思|有何意思|甚麼指令|甚麼限制|甚麼情況|甚麼設施|甚麼危險|有何分別|哪一條是|各自代表|正確手勢是怎樣/.test(p) &&
+      (Boolean(s) || /反光路釘|危險標記|四種底色|行車時間顯示|東.*中.*西|黃色橫條|文字警告|手號/.test(p));
     if (asksMeaning) {
       state.scenarioLabel = s ? "3D 路況實境 · 觀察路面與標誌作答" : "3D 路況實境 · 觀察路面細節作答";
     }
@@ -2498,11 +2686,26 @@ import { createHongKongWorldProps } from "./world3d.js";
       } else if (kind === "pedestrian_zebra") {
         state.scenarioStopped = true;
         state.brakeTimer = 99;
-        state.scenarioLabel = /綠燈剛亮起|長者/.test(p) ? "實境：綠燈仍須讓行人先過" : "實境：斑馬線讓行人先過";
+        state.scenarioLabel = /綠燈剛亮起|長者/.test(p)
+          ? "實境：綠燈仍須讓行人先過"
+          : wg.greenManGroup.visible
+            ? "實境：綠色人像過路處 · 禮讓行人"
+            : "實境：斑馬線讓行人先過";
       } else if (kind === "yellow_box_rail") {
-        state.scenarioStopped = true;
-        state.brakeTimer = 99;
-        state.scenarioLabel = "實境：出口受阻 · 留守黃格外";
+        if (ybMesh.visible) {
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：出口受阻 · 留守黃格外";
+        } else if (wg.yellowStopLineMesh.visible) {
+          state.scenarioStopped = true;
+          state.brakeTimer = 99;
+          state.scenarioLabel = "實境：電車站黃色停車線 · 停車讓客";
+        } else {
+          state.scenarioStopped = false;
+          state.scenarioSlow = true;
+          state.brakeTimer = 0;
+          state.scenarioLabel = "實境：安全讓行香港電車／輕鐵";
+        }
       } else if (kind === "slope_hill" && /泊車|斜路泊/.test(p)) {
         const isUpWithKerb = state.scenarioSlope > 0 && leftCurb.visible;
         state.scenarioParkedWheel = isUpWithKerb ? "right" : "left";
@@ -2589,7 +2792,23 @@ import { createHongKongWorldProps } from "./world3d.js";
         state.scenarioStopped = true;
         state.brakeTimer = 99;
       } else if (kind === "highway_overtake") {
-        if (state.scenarioCanOvertake) {
+        if (state.scenarioAbortOvertake) {
+          // q135: Lead car accelerated -> indicate left, slow gently, return cleanly behind lead car in left lane!
+          state.lane = "left";
+          state.targetX = LEFT_LANE_X;
+          state.blinkerDir = -1;
+          state.blinkerTimer = 2.0;
+          state.brakeTimer = 1.0;
+          state.scenarioNpcTargetZ = -5.6;
+        } else if (state.scenarioPassLeft) {
+          // q19: Lead car signalling right -> pass smoothly on the LEFT!
+          state.lane = "left";
+          state.targetX = LEFT_LANE_X;
+          if (!silent) state.boostTimer = 0.9;
+        } else if (/港珠澳/.test(p)) {
+          state.lane = "right";
+          state.targetX = RIGHT_LANE_X;
+        } else if (state.scenarioCanOvertake) {
           state.lane = "right";
           state.targetX = RIGHT_LANE_X;
           state.blinkerDir = 1;
@@ -2644,6 +2863,9 @@ import { createHongKongWorldProps } from "./world3d.js";
   // ==================== PUBLIC API FOR app.js ====================
   window.OneTake3D = {
     mount: mountToView,
+    supportsQuestion(q) {
+      return !!(q && !HIDE_3D_IDS.has(q.id));
+    },
     setTheme(dark) {
       state.isDark = !!dark;
       if (prefersReducedMotion()) renderSingleFrame();
@@ -2844,7 +3066,11 @@ import { createHongKongWorldProps } from "./world3d.js";
     }
 
     // Animate modular real-world HK 3D road actors & dynamic scrolling structures
-    hkWorld.animate(dt, elapsed, { roadSpeed: state.roadSpeed });
+    hkWorld.animate(dt, elapsed, {
+      roadSpeed: state.roadSpeed,
+      roadOffset: state.roadOffset,
+      greenManFlash: state.scenarioGreenManFlash
+    });
 
     // Animate scenario-specific dynamic props
     if (state.scenarioAmberGantry) {
@@ -2880,14 +3106,40 @@ import { createHongKongWorldProps } from "./world3d.js";
       if (ambGroup.position.z < -15.5) ambGroup.position.z = 2.6;
     }
     if (busGroup.visible) {
-      busGroup.position.z = -5.6 + Math.sin(elapsed * 0.7) * 0.65;
+      if (state.scenarioContraflowBus) {
+        // q30: Contraflow HK double-decker bus approaches TOWARD you (+Z) in opposite left lane!
+        const rel = Math.max(4.5, Math.abs(state.roadSpeed) + 3.5);
+        busGroup.position.z += rel * dt;
+        if (busGroup.position.z > 4.6) busGroup.position.z = -16.5;
+      } else {
+        busGroup.position.z = -5.6 + Math.sin(elapsed * 0.7) * 0.65;
+      }
     }
     if (npcCarGroup.visible) {
-      // Only pass the lead NPC car when our car actually moved into the right lane to overtake (zero collision!)
-      const overtakingNow = state.scenarioOutcome === "right" && state.scenarioCanOvertake && state.lane === "right";
+      const overtakingNow =
+        (state.scenarioOutcome === "right" && state.scenarioCanOvertake && state.lane === "right") ||
+        (state.scenarioOutcome === "right" && state.scenarioPassLeft);
       npcCarGroup.position.z = overtakingNow
         ? THREE.MathUtils.damp(npcCarGroup.position.z, 2.2, 1.4, dt)
-        : THREE.MathUtils.damp(npcCarGroup.position.z, -4.8 + Math.sin(elapsed * 1.0) * 0.35, 3.0, dt);
+        : THREE.MathUtils.damp(npcCarGroup.position.z, state.scenarioNpcTargetZ + Math.sin(elapsed * 1.0) * 0.25, 3.0, dt);
+
+      if (state.scenarioNpcRightBlink) {
+        npcRightBlinkerMat.emissiveIntensity = Math.floor(elapsed * 5.5) % 2 === 0 ? 3.0 : 0.08;
+      } else {
+        npcRightBlinkerMat.emissiveIntensity = 0.08;
+      }
+      if (driverArmPivot.visible) {
+        if (state.scenarioArmSignal === "left_circle") {
+          driverArmPivot.rotation.z = Math.sin(elapsed * 4.8) * 0.45;
+          driverArmPivot.rotation.y = Math.cos(elapsed * 4.8) * 0.35;
+        } else if (state.scenarioArmSignal === "slow_wave") {
+          driverArmPivot.rotation.z = Math.sin(elapsed * 5.2) * 0.46;
+          driverArmPivot.rotation.y = 0;
+        } else {
+          driverArmPivot.rotation.z = 0;
+          driverArmPivot.rotation.y = 0;
+        }
+      }
     }
     if (rainInst.visible) {
       for (let i = 0; i < RAIN_COUNT; i++) {

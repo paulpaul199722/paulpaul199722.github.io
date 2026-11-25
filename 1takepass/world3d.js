@@ -975,6 +975,179 @@ export function createHongKongWorldProps({
   parkingBayGroup.add(bayFront, bayRear, baySide);
   scenarioRoot.add(parkingBayGroup);
 
+  // ==================== 18. PRECISION UPGRADES (q44, q43/q117, q15/q118/q16, q25, q121/q277, q154/q163/q196) ====================
+  // A. Single Dashed Yellow Curb Line (q44 — 單行黃色虛線!)
+  const curbYellowDashedGroup = new THREE.Group();
+  curbYellowDashedGroup.visible = false;
+  for (let i = 0; i < 16; i++) {
+    const seg = new THREE.Mesh(new THREE.PlaneGeometry(0.11, 1.15), yellowPaintMat);
+    seg.rotation.x = -Math.PI / 2;
+    seg.position.set(-roadWidth / 2 + 0.14, 0.011, 4 - i * 2.4);
+    curbYellowDashedGroup.add(seg);
+  }
+  scenarioRoot.add(curbYellowDashedGroup);
+
+  // B. Colored No-Stopping Restriction Poles (q43 Red+Green, q117 Yellow+Grey!)
+  const coloredPolesGroup = new THREE.Group();
+  coloredPolesGroup.visible = false;
+  const makeRestrictPole = (hex, zPos) => {
+    const g = new THREE.Group();
+    const p = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055, 0.06, 1.95, 10),
+      new THREE.MeshStandardMaterial({ color: hex, roughness: 0.35 })
+    );
+    p.position.y = 0.97;
+    const cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.24, 0.24, 0.05, 18),
+      new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.35 })
+    );
+    cap.rotation.x = Math.PI / 2;
+    cap.position.set(0, 2.02, 0.03);
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.24, 0.04, 8, 20),
+      redPaintMat
+    );
+    rim.position.set(0, 2.02, 0.055);
+    g.add(p, cap, rim);
+    g.position.set(-2.78, 0, zPos);
+    return g;
+  };
+  const poleRed = makeRestrictPole(0xdc2626, -3.8);
+  const poleGreen = makeRestrictPole(0x059669, -6.4);
+  const poleYellow = makeRestrictPole(0xeab308, -3.8);
+  const poleGrey = makeRestrictPole(0x94a3b8, -6.4);
+  coloredPolesGroup.add(poleRed, poleGreen, poleYellow, poleGrey);
+  scenarioRoot.add(coloredPolesGroup);
+
+  // C. Stopping Distance Visual Zones (Amber Thinking Distance + Red Braking Distance!)
+  const stoppingZonesGroup = new THREE.Group();
+  stoppingZonesGroup.visible = false;
+  const thinkMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.78 });
+  const brakeZoneMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.82 });
+  const thinkingStrip = new THREE.Mesh(new THREE.PlaneGeometry(1.62, 1.9), thinkMat);
+  thinkingStrip.rotation.x = -Math.PI / 2;
+  thinkingStrip.position.set(-1.05, 0.016, -2.25);
+  const stopDivider = new THREE.Mesh(new THREE.PlaneGeometry(1.68, 0.1), whiteLineMat);
+  stopDivider.rotation.x = -Math.PI / 2;
+  stopDivider.position.set(-1.05, 0.018, -3.22);
+  const brakingStrip = new THREE.Mesh(new THREE.PlaneGeometry(1.62, 2.75), brakeZoneMat);
+  brakingStrip.rotation.x = -Math.PI / 2;
+  brakingStrip.position.set(-1.05, 0.016, -4.65);
+  stoppingZonesGroup.add(thinkingStrip, stopDivider, brakingStrip);
+  scenarioRoot.add(stoppingZonesGroup);
+
+  // D. Three White Dashed Road Line Types Side-by-Side (q25 — 行車線界線 vs 警告線!)
+  const threeWhiteLinesGroup = new THREE.Group();
+  threeWhiteLinesGroup.visible = false;
+  // Left: short dash long gap (lane line — 0.55m dash / 1.65m gap, exact 2.2m cycle for seamless scroll)
+  for (let i = 0; i < 12; i++) {
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.55), whiteLineMat);
+    s.rotation.x = -Math.PI / 2;
+    s.position.set(-1.35, 0.015, 2 - i * 2.2);
+    threeWhiteLinesGroup.add(s);
+  }
+  // Center: medium dash medium gap (1.05m dash / 1.15m gap)
+  for (let i = 0; i < 12; i++) {
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 1.05), whiteLineMat);
+    s.rotation.x = -Math.PI / 2;
+    s.position.set(0, 0.015, 2 - i * 2.2);
+    threeWhiteLinesGroup.add(s);
+  }
+  // Right: LONG dash SHORT gap (警告線 warning line — 1.68m dash / 0.52m gap!)
+  for (let i = 0; i < 12; i++) {
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 1.68), whiteLineMat);
+    s.rotation.x = -Math.PI / 2;
+    s.position.set(1.35, 0.015, 2 - i * 2.2);
+    threeWhiteLinesGroup.add(s);
+  }
+  scenarioRoot.add(threeWhiteLinesGroup);
+
+  // E. Iconic HK Green Double-Decker Tram ("Ding Ding") + Yellow Stop Line (q121, q277, q280!)
+  const hkTramGroup = new THREE.Group();
+  hkTramGroup.visible = false;
+  const tramLower = new THREE.Mesh(
+    new THREE.BoxGeometry(1.12, 1.88, 3.85),
+    new THREE.MeshPhysicalMaterial({ color: 0x047857, roughness: 0.3, clearcoat: 0.75 })
+  );
+  tramLower.position.y = 1.06;
+  tramLower.castShadow = true;
+  const tramCream = new THREE.Mesh(
+    new THREE.BoxGeometry(1.14, 0.28, 3.87),
+    new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.4 })
+  );
+  tramCream.position.y = 1.02;
+  const tramWinTop = new THREE.Mesh(
+    new THREE.BoxGeometry(1.135, 0.44, 3.45),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.15 })
+  );
+  tramWinTop.position.y = 1.62;
+  const tramPanto = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 6), darkMetalMat);
+  tramPanto.position.set(0, 2.3, 0);
+  tramPanto.rotation.x = 0.25;
+  [-0.35, 0.35].forEach((tx) => {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.05), npcTailMat);
+    tl.position.set(tx, 0.46, 1.94);
+    hkTramGroup.add(tl);
+  });
+  hkTramGroup.add(tramLower, tramCream, tramWinTop, tramPanto);
+  hkTramGroup.position.set(0.0, 0, -6.0);
+  scenarioRoot.add(hkTramGroup);
+
+  const yellowStopLineMesh = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth / 2 - 0.1, 0.36), yellowPaintMat);
+  yellowStopLineMesh.rotation.x = -Math.PI / 2;
+  yellowStopLineMesh.position.set(-1.12, 0.018, -2.55);
+  yellowStopLineMesh.visible = false;
+  scenarioRoot.add(yellowStopLineMesh);
+
+  // F. HK Pedestrian Green-Man Signal Crossing (q154, q163, q196, q65 — replaces zebra beacons!)
+  const greenManTex = makeCanvasTexture(96, 96, (ctx, w, h) => {
+    ctx.fillStyle = "#0b1a14";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#10b981";
+    ctx.beginPath();
+    ctx.arc(48, 22, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#10b981";
+    ctx.lineWidth = 8;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(48, 34); ctx.lineTo(48, 60);
+    ctx.moveTo(48, 42); ctx.lineTo(30, 56);
+    ctx.moveTo(48, 42); ctx.lineTo(66, 52);
+    ctx.moveTo(48, 60); ctx.lineTo(34, 82);
+    ctx.moveTo(48, 60); ctx.lineTo(64, 82);
+    ctx.stroke();
+  });
+  const greenManGroup = new THREE.Group();
+  greenManGroup.visible = false;
+  const gmFaceMat = new THREE.MeshStandardMaterial({
+    map: greenManTex,
+    emissive: 0x10b981,
+    emissiveMap: greenManTex,
+    emissiveIntensity: 2.0,
+    roughness: 0.2
+  });
+  [-2.82, 2.82].forEach((gx) => {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.15, 10), darkMetalMat);
+    p.position.set(gx, 1.08, -3.15);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.56, 0.24), darkMetalMat);
+    box.position.set(gx, 1.98, -3.15);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.28), gmFaceMat);
+    face.position.set(gx, 1.86, -3.02);
+    greenManGroup.add(p, box, face);
+  });
+  // White pedestrian stud bars on road (not zebra stripes!)
+  for (let i = 0; i < 6; i++) {
+    const s1 = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.14), whiteLineMat);
+    s1.rotation.x = -Math.PI / 2;
+    s1.position.set(-1.85 + i * 0.74, 0.015, -2.45);
+    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.14), whiteLineMat);
+    s2.rotation.x = -Math.PI / 2;
+    s2.position.set(-1.85 + i * 0.74, 0.015, -3.85);
+    greenManGroup.add(s1, s2);
+  }
+  scenarioRoot.add(greenManGroup);
+
   // ==================== RESET ALL ====================
   function resetAll() {
     dualEndGroup.visible = false;
@@ -1025,10 +1198,23 @@ export function createHongKongWorldProps({
     chevronCurveGroup.visible = false;
     roadSpeed50Mesh.visible = false;
     parkingBayGroup.visible = false;
+    curbYellowDashedGroup.visible = false;
+    curbYellowDashedGroup.position.z = 0;
+    coloredPolesGroup.visible = false;
+    poleRed.visible = poleGreen.visible = poleYellow.visible = poleGrey.visible = false;
+    stoppingZonesGroup.visible = false;
+    brakingStrip.scale.y = 1;
+    brakingStrip.position.z = -4.65;
+    threeWhiteLinesGroup.visible = false;
+    threeWhiteLinesGroup.position.z = 0;
+    hkTramGroup.visible = false;
+    yellowStopLineMesh.visible = false;
+    greenManGroup.visible = false;
+    gmFaceMat.emissiveIntensity = 2.0;
   }
 
   // ==================== PER-FRAME ANIMATION (ZERO ALLOCATIONS) ====================
-  function animate(dt, elapsed, { roadSpeed }) {
+  function animate(dt, elapsed, { roadSpeed, roadOffset = 0, greenManFlash = false }) {
     if (oncomingCarGroup.visible) {
       // Oncoming vehicle approaches toward +Z (relative speed = our roadSpeed + oncoming speed)
       const rel = Math.max(3.5, Math.abs(roadSpeed) + 3.8);
@@ -1081,6 +1267,15 @@ export function createHongKongWorldProps({
         if (sz > 3.5) sz = -13.5;
         roadSpeed50Mesh.position.z = sz;
       }
+    }
+    if (curbYellowDashedGroup.visible) {
+      curbYellowDashedGroup.position.z = ((roadOffset % 2.4) + 2.4) % 2.4;
+    }
+    if (threeWhiteLinesGroup.visible) {
+      threeWhiteLinesGroup.position.z = ((roadOffset % 2.2) + 2.2) % 2.2;
+    }
+    if (greenManGroup.visible) {
+      gmFaceMat.emissiveIntensity = greenManFlash ? (Math.floor(elapsed * 3.0) % 2 === 0 ? 2.4 : 0.15) : 2.0;
     }
   }
 
@@ -1140,7 +1335,19 @@ export function createHongKongWorldProps({
       hazardPostsGroup,
       chevronCurveGroup,
       roadSpeed50Mesh,
-      parkingBayGroup
+      parkingBayGroup,
+      curbYellowDashedGroup,
+      coloredPolesGroup,
+      poleRed,
+      poleGreen,
+      poleYellow,
+      poleGrey,
+      stoppingZonesGroup,
+      brakingStrip,
+      threeWhiteLinesGroup,
+      hkTramGroup,
+      yellowStopLineMesh,
+      greenManGroup
     }
   };
 }

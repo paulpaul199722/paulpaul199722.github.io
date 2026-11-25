@@ -558,16 +558,18 @@
   }
 
   function syncQuiz3DVisibility() {
+    const q = session ? session.questions[session.index] : null;
+    const supported = !q || window.OneTake3D?.supportsQuestion?.(q) !== false;
     const btn = $("btn-toggle-quiz-3d");
     if (btn) {
+      btn.hidden = !supported;
       btn.setAttribute("aria-pressed", String(quiz3dOn));
       btn.textContent = quiz3dOn ? "3D" : "3D 關";
     }
     if (!$("view-quiz").hidden) {
-      if (quiz3dOn) {
+      if (quiz3dOn && supported) {
         window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
-        if (session) {
-          const q = session.questions[session.index];
+        if (q) {
           const ans = session.answers[session.index];
           const showNow = !!ans && !session.revealAtEnd;
           window.OneTake3D?.setQuestion(q, { answered: showNow ? ans : null, force: true });
@@ -758,8 +760,14 @@
 
     const showNow = !!ans && !session.revealAtEnd;
 
-    if (quiz3dOn) {
+    const supports3d = window.OneTake3D?.supportsQuestion?.(q) !== false;
+    const quiz3dBtn = $("btn-toggle-quiz-3d");
+    if (quiz3dBtn) quiz3dBtn.hidden = !supports3d;
+    if (quiz3dOn && supports3d) {
+      window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
       window.OneTake3D?.setQuestion(q, { answered: showNow ? ans : null });
+    } else {
+      window.OneTake3D?.mount(null);
     }
 
     const visual = $("q-visual");
