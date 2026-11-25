@@ -56,6 +56,7 @@
   let summaryFilter = "all";
   let mistakeFilter = "active";
   let mistakeReasonFilter = null;
+  let studyFilter = "all";
   let summarySourceTab = "home";
   let lastEmotionText = "";
   let quiz3dOn = localStorage.getItem("onetake_quiz_3d") !== "off";
@@ -1376,29 +1377,60 @@
   }
 
   function renderStudyLab() {
-    const grid = $("contrast-grid");
-    if (grid.dataset.rendered) return;
-    grid.dataset.rendered = "1";
-    grid.innerHTML = window.CONTRAST_CARDS.map((c) => `
-      <article class="contrast-card">
-        <div class="contrast-head">
-          <h3>${esc(c.title)}</h3>
-          <span class="contrast-page tnum">${esc(c.page)}</span>
-        </div>
-        <div class="contrast-pair">
-          <div class="contrast-side">
-            <div class="contrast-svg">${window.renderSignImg(c.left.sign)}</div>
-            <strong>${esc(c.left.label)}</strong>
-            <p>${esc(c.left.rule)}</p>
+    const cards = window.CONTRAST_CARDS || [];
+    const heading = $("study-heading");
+    if (heading) heading.textContent = `${cards.length} 組高頻易混淆對比卡`;
+
+    const groupLabels = {
+      all: "全部",
+      command: "禁令指令",
+      warning: "警告路牌",
+      signals: "燈號手號",
+      markings: "地面標記",
+      numbers: "數字新例"
+    };
+    const counts = { all: cards.length };
+    for (const c of cards) counts[c.group] = (counts[c.group] || 0) + 1;
+
+    document.querySelectorAll("#study-filters .filter-btn").forEach((b) => {
+      const f = b.dataset.sfilter;
+      const active = f === studyFilter;
+      const n = counts[f] || 0;
+      b.textContent = `${groupLabels[f] || f} (${n})`;
+      b.classList.toggle("is-active", active);
+      b.setAttribute("aria-pressed", String(active));
+      b.onclick = () => {
+        if (studyFilter === f) return;
+        studyFilter = f;
+        renderStudyLab();
+      };
+    });
+
+    const filtered = studyFilter === "all" ? cards : cards.filter((c) => c.group === studyFilter);
+    const renderSide = (item) => `
+      <div class="contrast-side">
+        ${item.sign
+          ? `<div class="contrast-svg">${window.renderSignImg(item.sign)}</div>`
+          : `<div class="contrast-stat"><strong class="tnum">${esc(item.stat)}</strong><span>${esc(item.statSub || "")}</span></div>`}
+        <strong>${esc(item.label)}</strong>
+        <p>${esc(item.rule)}</p>
+      </div>`;
+
+    $("contrast-grid").innerHTML = filtered.map((c) => {
+      const list = Array.isArray(c.items) ? c.items : [c.left, c.right];
+      const trioCls = list.length >= 3 ? " is-trio" : "";
+      return `
+        <article class="contrast-card">
+          <div class="contrast-head">
+            <h3>${esc(c.title)}</h3>
+            <span class="contrast-page tnum">${esc(c.page)}</span>
           </div>
-          <div class="contrast-side">
-            <div class="contrast-svg">${window.renderSignImg(c.right.sign)}</div>
-            <strong>${esc(c.right.label)}</strong>
-            <p>${esc(c.right.rule)}</p>
+          <div class="contrast-pair${trioCls}">
+            ${list.map(renderSide).join("")}
           </div>
-        </div>
-        <div class="contrast-hook"><span class="hook-k">口訣</span><span>${esc(c.hook)}</span></div>
-      </article>`).join("");
+          <div class="contrast-hook"><span class="hook-k">口訣</span><span>${esc(c.hook)}</span></div>
+        </article>`;
+    }).join("");
   }
 
   function renderHistory() {

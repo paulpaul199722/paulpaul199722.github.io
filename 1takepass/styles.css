@@ -1633,6 +1633,10 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   font-weight: 500;
 }
 
+.study-filters {
+  margin-bottom: 14px;
+}
+
 .contrast-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1646,6 +1650,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   box-shadow: var(--shadow-card);
   display: grid;
   gap: 12px;
+  align-content: start;
 }
 
 .contrast-head {
@@ -1673,6 +1678,10 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   gap: 10px;
 }
 
+.contrast-pair.is-trio {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .contrast-side {
   border-radius: var(--r-sm);
   padding: 10px;
@@ -1682,6 +1691,36 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   align-items: center;
   text-align: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.contrast-stat {
+  width: 100%;
+  height: 112px;
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.contrast-stat strong {
+  font-size: 1.32rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--emerald);
+  line-height: 1.15;
+}
+
+.contrast-stat span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.3;
 }
 
 .contrast-svg {
@@ -2284,6 +2323,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   .chapter-row:nth-child(odd) { border-right: 0; }
   .chapter-row:nth-last-child(2) { border-bottom: 1px solid var(--border); }
   .contrast-grid { grid-template-columns: 1fr; }
+  .contrast-pair.is-trio { grid-template-columns: 1fr; }
   .leitner-strip { grid-template-columns: repeat(3, 1fr); gap: 12px; }
 }
 

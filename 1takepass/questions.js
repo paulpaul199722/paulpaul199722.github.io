@@ -5174,18 +5174,21 @@ window.QUESTIONS = [
   }
 ];
 
-// 8 Visual Contrastive Cards (Ultra-Concise Side-by-Side)
+// 36 High-Yield Visual & Number/Law Contrastive Cards (Grounded 100% in HK Road Users' Code + 2025–2026 Laws)
 window.CONTRAST_CARDS = [
+  // ==================== 禁令與指令 (14 組) ====================
   {
     id: "c1",
+    group: "command",
     title: "停車 STOP vs 讓路 GIVE WAY",
-    page: "P.79, 109",
+    page: "P.79, 111",
     left: { sign: "stop_oct", label: "八角形 STOP", rule: "無車都必完全停定" },
     right: { sign: "give_way", label: "倒三角 GIVE WAY", rule: "讓大路，安全可慢過" },
     hook: "八角必停定，倒三角讓大路"
   },
   {
     id: "c2",
+    group: "command",
     title: "不准停車 vs 不准泊車",
     page: "P.90–92, 111",
     left: { sign: "no_stopping", label: "紅交叉 ＝ 不准停車", rule: "連落客都唔得 · 實黃線" },
@@ -5194,6 +5197,7 @@ window.CONTRAST_CARDS = [
   },
   {
     id: "c3",
+    group: "command",
     title: "單程行車 vs 只准向前駛",
     page: "P.66, 111",
     left: { sign: "one_way", label: "藍長方 ＝ 單程路", rule: "整條路單向，路口可依標記轉" },
@@ -5202,43 +5206,327 @@ window.CONTRAST_CARDS = [
   },
   {
     id: "c4",
+    group: "command",
     title: "專營巴士線 vs 所有巴士線",
     page: "P.65, 113",
-    left: { sign: "bus_lane_franchised", label: "巴士圖案 ＝ 專營專用", rule: "只准專營巴士" },
-    right: { sign: "bus_lane_all", label: "Bus 巴士字 ＝ 所有巴士", rule: "專營及非專營均可" },
+    left: { sign: "bus_lane_franchised", label: "巴士圖案 ＝ 專營專用", rule: "只准專營巴士行駛" },
+    right: { sign: "bus_lane_all", label: "Bus 巴士字 ＝ 所有巴士", rule: "專營及非專營巴士均可" },
     hook: "畫公仔＝專營；寫中英文＝所有巴士"
   },
   {
     id: "c5",
+    group: "command",
     title: "禁止所有汽車 vs 電單車除外",
     page: "P.112 #33–34",
     left: { sign: "no_motor_all", label: "電單車＋汽車", rule: "所有汽車一律禁入" },
-    right: { sign: "no_motor_except_mc", label: "只畫私家車", rule: "禁汽車，電單車除外" },
+    right: { sign: "no_motor_except_mc", label: "只畫私家車", rule: "禁汽車，電單車及三輪車除外" },
     hook: "紅圈有畫就禁，無畫電單車＝豁免"
   },
   {
+    id: "c9",
+    group: "command",
+    title: "靠左行駛 vs 可取道任何一邊",
+    page: "P.66, 111",
+    left: { sign: "keep_left", label: "單一左下斜箭", rule: "必須靠安全島左邊駛過" },
+    right: { sign: "pass_either_side", label: "分叉雙下斜箭", rule: "安全島左右兩邊皆可通過" },
+    hook: "單箭只靠左，雙箭左右都通往同方向"
+  },
+  {
+    id: "c10",
+    group: "command",
+    title: "前面路口左轉 vs 不准左轉",
+    page: "P.111–112",
+    left: { sign: "turn_left_ahead", label: "藍圓白左箭", rule: "強制於前面路口必須左轉" },
+    right: { sign: "no_left_turn", label: "紅圈斜劃左箭", rule: "嚴禁左轉，須直行或右轉" },
+    hook: "藍圓一定要做，紅圈斜劃絕對唔准"
+  },
+  {
+    id: "c11",
+    group: "command",
+    title: "所有車輛不准駛入 vs 此路不通",
+    page: "P.111, 123",
+    left: { sign: "no_entry", label: "紅圓白橫棒", rule: "單程出口，所有車輛嚴禁駛入" },
+    right: { sign: "no_through_road", label: "藍方紅頂 T 字", rule: "掘頭路，可駛入但前面無出口" },
+    hook: "紅白橫棒禁入；藍底紅帽＝掘頭路"
+  },
+  {
+    id: "c12",
+    group: "command",
+    title: "不准超車 vs 不准換線",
+    page: "P.111–112",
+    left: { sign: "no_overtaking", label: "紅圈紅黑兩車", rule: "禁止超越前面行駛中汽車" },
+    right: { sign: "no_lane_change", label: "虛線夾紅交叉", rule: "禁止越過行車線轉線" },
+    hook: "兩架車並排＝禁超車；白線紅叉＝禁切線"
+  },
+  {
+    id: "c13",
+    group: "command",
+    title: "限高 4.5 米 vs 限重 10 公噸",
+    page: "P.112 #49–50",
+    left: { sign: "height_limit_45", label: "上下黑三角夾數字", rule: "連貨物高度不得超過所示米數" },
+    right: { sign: "weight_limit_10t", label: "純數字＋tonnes", rule: "車輛連乘客貨物總重上限" },
+    hook: "上下兩尖夾住＝度高；寫 tonnes＝計總重"
+  },
+  {
+    id: "c14",
+    group: "command",
+    title: "單車徑（禁汽車）vs 禁止單車進入",
+    page: "P.111–112",
+    left: { sign: "cycle_track", label: "藍圓白單車", rule: "單車專用徑，禁止汽車駛入" },
+    right: { sign: "no_bicycles", label: "紅圈黑單車", rule: "禁止單車及三輪車進入" },
+    hook: "藍圓單車專用；紅圈單車止步"
+  },
+  {
+    id: "c15",
+    group: "command",
+    title: "騎單車必須下車 vs 行人優先區",
+    page: "P.111–112",
+    left: { sign: "cycle_dismount", label: "紅圈推單車", rule: "必須落車推單車，不可騎行" },
+    right: { sign: "pedestrian_priority", label: "藍圓人車同行", rule: "行人優先使用，車輛須慢駛讓路" },
+    hook: "人企車側＝落車推；藍圓人車＝行人優先"
+  },
+  {
+    id: "c16",
+    group: "command",
+    title: "快速公路起點 vs 快速公路終止",
+    page: "P.113 #80–81",
+    left: { sign: "expressway_start", label: "綠底高架橋", rule: "進入快速公路（禁學牌／單車／行人）" },
+    right: { sign: "expressway_end", label: "綠底加紅斜線", rule: "快速公路終止，須留意新限速" },
+    hook: "綠橋起點即入高速規則，加紅斜線即終止"
+  },
+  {
+    id: "c17",
+    group: "command",
+    title: "警方停車檢查 vs 學校交通安全隊",
+    page: "P.111 #11–12",
+    left: { sign: "police_stop", label: "紅底「警 POLICE」", rule: "必須於標誌前停定候警員指示" },
+    right: { sign: "school_patrol", label: "停 STOP 兒童棒", rule: "見隊員舉棒必停車讓學童過路" },
+    hook: "兩塊都具法定效力，見到必完全停定"
+  },
+
+  // ==================== 警告路牌 (8 組) ====================
+  {
     id: "c6",
+    group: "warning",
     title: "前面雙程 vs 雙程橫過單程",
     page: "P.117 #57–58",
-    left: { sign: "warn_two_way_ahead", label: "直向 ↑↓", rule: "前面轉雙程行車" },
-    right: { sign: "warn_two_way_cross", label: "橫向 ←→", rule: "橫街為雙程路橫過" },
+    left: { sign: "warn_two_way_ahead", label: "直向 ↑↓", rule: "前面由單程轉為雙程行車" },
+    right: { sign: "warn_two_way_cross", label: "橫向 ←→", rule: "前面橫街為雙程路橫過" },
     hook: "直箭管前路，橫箭管橫街"
   },
   {
-    id: "c7",
-    title: "自動波斜路泊車扭軚",
-    page: "P.95",
-    left: { sign: "slope_park_up_kerb", label: "上斜＋有石壆 → 扭右", rule: "全港唯一扭右＋入 P 波" },
-    right: { sign: "slope_park_no_kerb", label: "下斜 / 無石壆 → 扭左", rule: "其餘全部扭左＋入 P 波" },
-    hook: "唯有「上斜有石」扭右，其餘全扭左"
+    id: "c18",
+    group: "warning",
+    title: "分隔車路終止 vs 兩邊道路收窄",
+    page: "P.116 #7, #10",
+    left: { sign: "warn_dual_end", label: "下方有黑色分道島", rule: "中央分道島完結，前面轉雙程" },
+    right: { sign: "warn_narrow_both", label: "純兩線向內收", rule: "前面道路兩旁同時收窄" },
+    hook: "下面多粒黑島＝分隔車路終止；冇島＝收窄"
   },
   {
+    id: "c19",
+    group: "warning",
+    title: "交通意外黑點 vs 行人意外黑點",
+    page: "P.116 #23–24",
+    left: { sign: "warn_blackspot", label: "紅三角一點大黑點", rule: "前面為車輛交通意外黑點" },
+    right: { sign: "warn_ped_blackspot", label: "行人＋紅黑點", rule: "前面為行人交通意外黑點" },
+    hook: "淨黑點＝車禍黑點；加個人仔＝行人黑點"
+  },
+  {
+    id: "c20",
+    group: "warning",
+    title: "前面路滑 vs 前面鬆脫碎石",
+    page: "P.120 #33–34",
+    left: { sign: "warn_slippery", label: "車尾交叉胎痕", rule: "前面路面濕滑，避免急剎猛扭軚" },
+    right: { sign: "warn_loose_chippings", label: "車胎彈起碎石", rule: "鬆脫碎石易彈花玻璃，須減速拉距" },
+    hook: "兩條蛇胎痕＝路滑；點點飛起＝碎石"
+  },
+  {
+    id: "c21",
+    group: "warning",
+    title: "前面有行人過路處 vs 前面有兒童",
+    page: "P.117 #38–39",
+    left: { sign: "warn_zebra_ahead", label: "大人行過虛線", rule: "前面有斑馬線／行人過路處" },
+    right: { sign: "warn_children", label: "兩童拖手跑", rule: "學校區或遊樂場附近，提防衝出" },
+    hook: "單人踏線＝過路處；兩細路跑＝前面有兒童"
+  },
+  {
+    id: "c22",
+    group: "warning",
+    title: "前面有輕鐵／電車 vs 只限輕鐵／電車",
+    page: "P.111, 117",
+    left: { sign: "warn_lrt_tram", label: "紅三角警告牌", rule: "警告前面有輕鐵或電車橫過／共行" },
+    right: { sign: "lrt_tram_only", label: "藍圓形指令牌", rule: "專線只限輕鐵或電車，私家車禁入" },
+    hook: "紅三角＝提你小心；藍圓＝私家車唔准入"
+  },
+  {
+    id: "c23",
+    group: "warning",
+    title: "前面有迴旋處 vs 前面有十字路口",
+    page: "P.116 #8, #25",
+    left: { sign: "warn_roundabout", label: "三箭順時針循環", rule: "香港迴旋處順時針行，必讓右方來車" },
+    right: { sign: "warn_crossroads", label: "黑色十字交叉", rule: "前面有十字路口，減速留意左右來車" },
+    hook: "圓圈箭嘴＝迴旋處讓右；大交叉＝十字路口"
+  },
+  {
+    id: "c24",
+    group: "warning",
+    title: "前面有騎單車者 vs 前面有殘疾人士",
+    page: "P.117 #34, #54",
+    left: { sign: "warn_cyclists", label: "紅三角單車圖", rule: "提防單車切線，超越須留足闊度" },
+    right: { sign: "warn_disabled", label: "紅三角輪椅圖", rule: "前面常有殘疾人士過路，須耐心禮讓" },
+    hook: "同屬弱勢道路使用者，見牌即減速拉遠距離"
+  },
+
+  // ==================== 燈號與手號 (4 組) ====================
+  {
+    id: "c25",
+    group: "signals",
+    title: "紅黃燈齊亮 vs 紅燈連左轉綠箭",
+    page: "P.106–107",
+    left: { sign: "signal_red_amber", label: "紅＋黃同時亮", rule: "預備開車，但仍嚴禁越過停車線" },
+    right: { sign: "signal_red_green_arrow", label: "紅燈＋綠左箭", rule: "只准往箭嘴方向安全轉左，直行必停" },
+    hook: "紅黃齊亮唔郁得；紅配綠箭淨准跟箭轉"
+  },
+  {
+    id: "c26",
+    group: "signals",
+    title: "消防局雙紅閃燈 vs 工程車對角黃閃燈",
+    page: "P.106, 140",
+    left: { sign: "signal_wigwag", label: "並排雙紅交替閃", rule: "緊急車輛出口／橋閘，必須停定" },
+    right: { sign: "roadworks_arrow_diag", label: "對角雙黃交替閃", rule: "工程車正準備轉線，減速留意讓路" },
+    hook: "並排紅閃必停車；對角黃閃＝工程車要切線"
+  },
+  {
+    id: "c27",
+    group: "signals",
+    title: "架空紅交叉 vs 架空綠左下斜箭",
+    page: "P.108",
+    left: { sign: "lane_signal_cross", label: "紅色交叉 ×", rule: "該行車線已封閉，嚴禁駛入或停留" },
+    right: { sign: "lane_signal_merge_left", label: "綠色左下斜箭 ↙", rule: "前面封線，須及早向箭嘴方向切線" },
+    hook: "紅叉即刻唔行得；綠斜箭提你早啲切過去"
+  },
+  {
+    id: "c28",
+    group: "signals",
+    title: "駕駛人三款必考手號（全用右臂）",
+    page: "P.105",
+    items: [
+      { sign: "hand_signal_left", label: "逆時針打圈", rule: "我要向左轉" },
+      { sign: "hand_signal_slow", label: "掌心向下上下擺", rule: "我要減速或停車" },
+      { sign: "hand_signal_right", label: "右臂平舉指右", rule: "我要向右轉／駛出" }
+    ],
+    hook: "打圈轉左、上下擺慢停、平舉指右轉右"
+  },
+
+  // ==================== 地面標記與泊車 (5 組) ====================
+  {
+    id: "c29",
+    group: "markings",
+    title: "連續雙白實線 vs 靠你一邊虛雙白線",
+    page: "P.125",
+    left: { sign: "road_double_white_solid", label: "兩條連續實線", rule: "嚴禁橫越、騎跨或於旁泊車" },
+    right: { sign: "road_double_white_broken", label: "靠你一邊虛線", rule: "確認安全時可越線超車或右轉" },
+    hook: "睇靠自己嗰條：實線唔准過，虛線安全過得"
+  },
+  {
+    id: "c30",
+    group: "markings",
+    title: "路旁黃線禁區 vs 三種白色單行虛線",
+    page: "P.124, 126",
+    left: { sign: "road_yellow_lines", label: "單／雙黃線", rule: "實黃禁停車（雙24h）；虛黃禁泊車" },
+    right: { sign: "road_white_lines", label: "三種白虛線", rule: "線長空短（最右）＝警告線，前面危險" },
+    hook: "黃線管停泊；白虛線越密越長＝警告危險"
+  },
+  {
+    id: "c31",
+    group: "markings",
+    title: "一般黃色方格 vs 電車／輕鐵黃色方格",
+    page: "P.78, 127",
+    left: { sign: "yellow_box_normal", label: "一般路口黃格", rule: "想右轉而出口暢通、只受對頭車阻可暫停" },
+    right: { sign: "road_yellow_box_rail", label: "電車／輕鐵黃格", rule: "出口受阻絕不可入，轉右亦不可停在格內" },
+    hook: "普通黃格右轉有豁免；電車輕鐵黃格零豁免"
+  },
+  {
+    id: "c32",
+    group: "markings",
+    title: "斑馬線之字線區 vs 電車站黃色停車線",
+    page: "P.127",
+    left: { sign: "zebra_crossing_mark", label: "斑馬線＋之字線", rule: "之字線區禁超車禁泊車；見人踏線必讓" },
+    right: { sign: "tram_stop_mark", label: "電車站黃色停車線", rule: "無安全島電車站上落客時，必停喺黃線後" },
+    hook: "之字區禁超車泊車；電車上落客停黃線後"
+  },
+  {
+    id: "c7",
+    group: "markings",
+    title: "自動波斜路泊車扭軚",
+    page: "P.95",
+    left: { sign: "slope_park_up_kerb", label: "上斜＋有石壆 → 扭右", rule: "全港唯一扭右＋入 P 波拉手掣" },
+    right: { sign: "slope_park_no_kerb", label: "下斜 / 無石壆 → 扭左", rule: "其餘 3 種情況全部扭左＋入 P 波" },
+    hook: "唯有「上斜有石」扭右，其餘全扭左"
+  },
+
+  // ==================== 數字與 2025–2026 新例 (5 組) ====================
+  {
     id: "c8",
-    title: "四色標誌杆 & 停車距離",
+    group: "numbers",
+    title: "四色禁區標誌杆 & 乾／濕停車距離",
     page: "P.54, 91",
     left: { sign: "pole_colors", label: "禁區杆四色時段", rule: "紅7–12｜黃7–7｜綠8–10,5–7｜灰其他" },
-    right: { sign: "stopping_distance_chart", label: "乾地停車距離", rule: "40→20m｜60→35m｜80→60m（濕剎×2）" },
-    hook: "思考＝車速÷4；濕地只把剎車×2"
+    right: { sign: "stopping_distance_chart", label: "乾地最短停車距離", rule: "40→20m｜60→35m｜80→60m（濕剎×2）" },
+    hook: "紅最長黃日頭綠返放工；思考＝車速÷4，濕地只將剎車×2"
+  },
+  {
+    id: "c33",
+    group: "numbers",
+    title: "P 牌（暫准牌）vs 學牌（學習牌）",
+    page: "P.48, 112",
+    left: { sign: "p_plate", label: "P 牌（12 個月）", rule: "最高 70 km/h · 三線公路禁最右線 · 前後掛 P" },
+    right: { sign: "no_learners", label: "學牌（禁快速公路）", rule: "禁快速公路／隧道／繁忙時間 · 須持牌師傅陪同" },
+    hook: "P 牌上得高速但限 70 禁最右；學牌高速隧道全禁"
+  },
+  {
+    id: "c34",
+    group: "numbers",
+    title: "酒駕法定上限：呼氣 vs 血液 vs 尿液",
+    page: "P.41",
+    items: [
+      { stat: "22 μg", statSub: "每 100 毫升呼氣", label: "呼氣測試上限", rule: "超過即屬酒駕（扣 10 分＋停牌）" },
+      { stat: "50 mg", statSub: "每 100 毫升血液", label: "血液酒精上限", rule: "與 22 微克呼氣同等法定標準" },
+      { stat: "67 mg", statSub: "每 100 毫升尿液", label: "尿液酒精上限", rule: "由細到大：22 → 50 → 67" }
+    ],
+    hook: "呼血尿由細到大：22 微克 → 50 毫克 → 67 毫克"
+  },
+  {
+    id: "c35",
+    group: "numbers",
+    title: "2025–2026 最新生效法例必考兩大新制",
+    page: "2025–2026 新例",
+    left: {
+      stat: "≤ 2 部",
+      statSub: "對角 ≤ 19 cm",
+      label: "2026.1.25 流動電訊裝置",
+      rule: "行車時司機前方最多放 2 部、對角不逾 19 厘米、不阻視線、禁手持"
+    },
+    right: {
+      stat: "< 8 歲",
+      statSub: "或未滿 1.35 米",
+      label: "2025.11.1 兒童束縛設備",
+      rule: "私家車前後座均須用兒童安全座椅／增高墊，違例罰司機"
+    },
+    hook: "車頭最多 2 部 19cm 內；8 歲以下兼未夠 1.35m 必坐兒童椅"
+  },
+  {
+    id: "c36",
+    group: "numbers",
+    title: "全卷必背四大距離數字總整理",
+    page: "P.20, 41, 54, 134",
+    items: [
+      { stat: "23 米", statSub: "充足光線讀車牌", label: "考牌視力標準", rule: "約等於兩架雙層巴士長度" },
+      { stat: "15 米", statSub: "天橋／隧道／綠公仔", label: "行人過路處範圍", rule: "兩旁 15 米內不得橫過馬路" },
+      { stat: "≥ 50 米", statSub: "限速 ≤50 km/h 路", label: "壞車三角警告牌", rule: "放車後 ≥50 米；快速公路嚴禁放牌" }
+    ],
+    hook: "23 視力、15 過路、雙 50 三角牌（加上 2 秒乾／4 秒濕跟車！）"
   }
 ];
 

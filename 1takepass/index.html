@@ -341,10 +341,18 @@
       <section class="group-section">
         <div class="sec-head wrap">
           <div>
-            <h2>8 組易混淆對比卡</h2>
-            <span class="sec-sub">並排睇清分別 · 點擊圖片可放大</span>
+            <h2 id="study-heading">36 組高頻易混淆對比卡</h2>
+            <span class="sec-sub">並排睇清分別 · 涵蓋官方路牌、手號、標記與 2025–2026 新例 · 點圖可放大</span>
           </div>
           <button class="btn btn-primary btn-sm" id="btn-study-drill-signs" type="button">專攻圖片路牌題</button>
+        </div>
+        <div class="filter-bar study-filters" id="study-filters" role="group" aria-label="對比卡分類篩選">
+          <button class="filter-btn is-active" data-sfilter="all" type="button" aria-pressed="true">全部</button>
+          <button class="filter-btn" data-sfilter="command" type="button" aria-pressed="false">禁令指令</button>
+          <button class="filter-btn" data-sfilter="warning" type="button" aria-pressed="false">警告路牌</button>
+          <button class="filter-btn" data-sfilter="signals" type="button" aria-pressed="false">燈號手號</button>
+          <button class="filter-btn" data-sfilter="markings" type="button" aria-pressed="false">地面標記</button>
+          <button class="filter-btn" data-sfilter="numbers" type="button" aria-pressed="false">數字新例</button>
         </div>
         <div class="contrast-grid" id="contrast-grid"></div>
       </section>
