@@ -564,8 +564,17 @@
       btn.textContent = quiz3dOn ? "3D" : "3D 關";
     }
     if (!$("view-quiz").hidden) {
-      if (quiz3dOn) window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
-      else window.OneTake3D?.mount(null);
+      if (quiz3dOn) {
+        window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
+        if (session) {
+          const q = session.questions[session.index];
+          const ans = session.answers[session.index];
+          const showNow = !!ans && !session.revealAtEnd;
+          window.OneTake3D?.setQuestion(q, { answered: showNow ? ans : null, force: true });
+        }
+      } else {
+        window.OneTake3D?.mount(null);
+      }
     }
   }
 
@@ -748,6 +757,10 @@
     $("q-meta").innerHTML = metaParts.join(`<span class="meta-sep" aria-hidden="true">·</span>`);
 
     const showNow = !!ans && !session.revealAtEnd;
+
+    if (quiz3dOn) {
+      window.OneTake3D?.setQuestion(q, { answered: showNow ? ans : null });
+    }
 
     const visual = $("q-visual");
     if (q.sign && window.SIGN_ASSETS[q.sign]) {
@@ -968,7 +981,7 @@
     } else {
       playTone("wrong");
     }
-    window.OneTake3D?.reactAnswer({ isRight, combo: session.combo, wasPreviouslyWrong });
+    window.OneTake3D?.reactAnswer({ isRight, combo: session.combo, wasPreviouslyWrong, question: q });
 
     renderCurrentQuestion();
     renderHome();
