@@ -557,23 +557,39 @@
     return shuffle([...imgs, ...txts]);
   }
 
+  function buildQuizProgressPayload({ snap = false } = {}) {
+    if (!session) return null;
+    const total = session.questions.length;
+    const answered = Object.keys(session.answers).length;
+    const right = Object.values(session.answers).filter((a) => a.isRight).length;
+    return {
+      answered,
+      total,
+      right,
+      combo: session.combo || 0,
+      isExam: session.mode === "exam",
+      passMin: PASS_MIN,
+      revealAtEnd: !!session.revealAtEnd,
+      snap
+    };
+  }
+
   function syncQuiz3DVisibility() {
-    const q = session ? session.questions[session.index] : null;
-    const supported = !q || window.OneTake3D?.supportsQuestion?.(q) !== false;
     const btn = $("btn-toggle-quiz-3d");
     if (btn) {
-      btn.hidden = !supported;
+      btn.hidden = false;
       btn.setAttribute("aria-pressed", String(quiz3dOn));
-      btn.textContent = quiz3dOn ? "3D" : "3D 關";
+      btn.textContent = quiz3dOn ? "進度車" : "進度車 關";
+      btn.title = "顯示或收起 3D 情緒進度條";
     }
+    const flatTrack = document.querySelector("#view-quiz .progress-track");
+    if (flatTrack) flatTrack.hidden = quiz3dOn;
+
     if (!$("view-quiz").hidden) {
-      if (quiz3dOn && supported) {
+      if (quiz3dOn) {
         window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
-        if (q) {
-          const ans = session.answers[session.index];
-          const showNow = !!ans && !session.revealAtEnd;
-          window.OneTake3D?.setQuestion(q, { answered: showNow ? ans : null, force: true });
-        }
+        const payload = buildQuizProgressPayload({ snap: true });
+        if (payload) window.OneTake3D?.setProgress(payload);
       } else {
         window.OneTake3D?.mount(null);
       }
@@ -760,12 +776,14 @@
 
     const showNow = !!ans && !session.revealAtEnd;
 
-    const supports3d = window.OneTake3D?.supportsQuestion?.(q) !== false;
     const quiz3dBtn = $("btn-toggle-quiz-3d");
-    if (quiz3dBtn) quiz3dBtn.hidden = !supports3d;
-    if (quiz3dOn && supports3d) {
+    if (quiz3dBtn) quiz3dBtn.hidden = false;
+    const flatTrack = document.querySelector("#view-quiz .progress-track");
+    if (flatTrack) flatTrack.hidden = quiz3dOn;
+    if (quiz3dOn) {
       window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
-      window.OneTake3D?.setQuestion(q, { answered: showNow ? ans : null });
+      const payload = buildQuizProgressPayload({ snap: false });
+      if (payload) window.OneTake3D?.setProgress(payload);
     } else {
       window.OneTake3D?.mount(null);
     }
@@ -989,7 +1007,21 @@
     } else {
       playTone("wrong");
     }
-    window.OneTake3D?.reactAnswer({ isRight, combo: session.combo, wasPreviouslyWrong, question: q });
+    const answered = Object.keys(session.answers).length;
+    const right = Object.values(session.answers).filter((a) => a.isRight).length;
+    if (quiz3dOn) {
+      window.OneTake3D?.reactAnswer({
+        isRight,
+        combo: session.combo,
+        wasPreviouslyWrong,
+        answered,
+        total: session.questions.length,
+        right,
+        isExam: session.mode === "exam",
+        passMin: PASS_MIN,
+        emotion
+      });
+    }
 
     renderCurrentQuestion();
     renderHome();
