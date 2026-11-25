@@ -2071,7 +2071,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   flex-direction: column;
 }
 .stage-3d-shell[data-mode="quiz"] .stage-3d-viewport {
-  height: 86px;
+  height: 108px;
   order: 2;
 }
 .stage-3d-shell[data-mode="quiz"] .stage-3d-top {
@@ -2304,7 +2304,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
   .lb-cell span { font-size: 0.68rem; }
   .lb-cell small { font-size: 0.62rem; }
   .stage-3d-viewport { height: 172px; }
-  .stage-3d-shell[data-mode="quiz"] .stage-3d-viewport { height: 72px; }
+  .stage-3d-shell[data-mode="quiz"] .stage-3d-viewport { height: 86px; }
   .stage-3d-shell[data-mode="quiz"] .stage-3d-top { padding: 5px 10px; gap: 6px; }
   .stage-3d-shell[data-mode="quiz"] .stage-3d-pill { font-size: 0.72rem; }
   .stage-3d-hint { display: none; }
