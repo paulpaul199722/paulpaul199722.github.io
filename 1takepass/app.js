@@ -40,19 +40,83 @@
     });
   }
 
+  // ==================== SAFE STORAGE HELPERS ====================
+  function lsGet(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function lsSet(key, val) {
+    try {
+      window.localStorage.setItem(key, val);
+      return true;
+    } catch (err) {
+      console.warn("localStorage write failed:", err);
+      return false;
+    }
+  }
+
+  function lsRemove(key) {
+    try {
+      window.localStorage.removeItem(key);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function ssGet(key) {
+    try {
+      return window.sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function ssSet(key, val) {
+    try {
+      window.sessionStorage.setItem(key, val);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function ssRemove(key) {
+    try {
+      window.sessionStorage.removeItem(key);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const DEFAULT_STATS = () => ({
+    total_answered: 0,
+    total_correct: 0,
+    best_combo: 0,
+    current_combo: 0,
+    exams_passed: 0,
+    xp: 0
+  });
+
   // ==================== STATE ====================
   let db = null;
   let realtimeChannel = null;
   let lastSyncFetchAt = 0;
-  let profileId = localStorage.getItem("onetake_profile") || "default";
-  let soundOn = localStorage.getItem("onetake_sound") !== "off";
-  let revealAtEndPref = localStorage.getItem("onetake_reveal_end") === "1";
+  let profileId = lsGet("onetake_profile") || "default";
+  let soundOn = lsGet("onetake_sound") !== "off";
+  let revealAtEndPref = lsGet("onetake_reveal_end") === "1";
   let progressMap = {};
-  let stats = { total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0 };
+  let stats = DEFAULT_STATS();
   let examHistory = [];
   let pendingSyncIds = new Set();
   let pendingStatsSync = false;
   let statsSyncSeq = 0;
+  const inFlightExamIds = new Set();
   let syncState = { ok: null, text: "同步中" };
 
   let session = null;
@@ -61,10 +125,14 @@
   let mistakeReasonFilter = null;
   let studyFilter = "all";
   let summarySourceTab = "home";
+  let lastSummaryPassed = false;
+  let mounted3dView = null;
   let lastEmotionText = "";
-  let quiz3dOn = localStorage.getItem("onetake_quiz_3d") !== "off";
+  let quiz3dOn = lsGet("onetake_quiz_3d") !== "off";
   let noticeTimer = null;
   let lastFocusedEl = null;
+
+  const has3D = () => Boolean(window.OneTake3D);
 
   const Q_BY_ID = Object.fromEntries(window.QUESTIONS.map((q) => [q.id, q]));
   const $ = (id) => document.getElementById(id);
@@ -223,41 +291,119 @@
   }
 
   // ==================== STORAGE & SUPABASE ====================
-  const cacheKey = (k) => `onetake_${profileId}_${k}`;
+  const cacheKeyFor = (pid, k) => `onetake_${pid}_${k}`;
+  const cacheKey = (k) => cacheKeyFor(profileId, k);
+  const draftSessionKey = (pid = profileId) => `onetake_${pid}_draft_session`;
+
+  function saveDraftSession() {
+    if (!session || session.submitted || Object.keys(session.answers).length === 0) {
+      clearDraftSession(profileId);
+      return;
+    }
+    const payload = {
+      mode: session.mode,
+      label: session.label,
+      qIds: session.questions.map((q) => q.id),
+      revealAtEnd: !!session.revealAtEnd,
+      index: session.index,
+      answers: session.answers,
+      combo: session.combo || 0
+    };
+    ssSet(draftSessionKey(profileId), JSON.stringify(payload));
+  }
+
+  function clearDraftSession(pid = profileId) {
+    ssRemove(draftSessionKey(pid));
+  }
+
+  function restoreDraftSession(pid = profileId) {
+    const rawStr = ssGet(draftSessionKey(pid));
+    if (!rawStr) return;
+    try {
+      const raw = JSON.parse(rawStr);
+      if (!raw || typeof raw !== "object" || !Array.isArray(raw.qIds) || raw.qIds.length === 0) {
+        clearDraftSession(pid);
+        return;
+      }
+      const questions = raw.qIds.map((id) => Q_BY_ID[id]).filter(Boolean);
+      if (questions.length !== raw.qIds.length) {
+        clearDraftSession(pid);
+        return;
+      }
+      const rawAnswers = raw.answers && typeof raw.answers === "object" && !Array.isArray(raw.answers) ? raw.answers : {};
+      const answers = {};
+      for (const [k, v] of Object.entries(rawAnswers)) {
+        const idx = Number(k);
+        if (Number.isInteger(idx) && idx >= 0 && idx < questions.length && v && typeof v === "object") {
+          answers[idx] = v;
+        }
+      }
+      if (Object.keys(answers).length === 0) {
+        clearDraftSession(pid);
+        return;
+      }
+      const rawIdx = Number(raw.index);
+      const index = Number.isInteger(rawIdx) ? Math.max(0, Math.min(questions.length - 1, rawIdx)) : 0;
+      session = {
+        mode: typeof raw.mode === "string" ? raw.mode : "exam",
+        label: typeof raw.label === "string" ? raw.label : "模擬試",
+        questions,
+        revealAtEnd: !!raw.revealAtEnd,
+        index,
+        answers,
+        combo: Number.isFinite(raw.combo) && raw.combo > 0 ? Math.floor(raw.combo) : 0,
+        submitted: false
+      };
+    } catch {
+      clearDraftSession(pid);
+    }
+  }
+
+  const hasUnsyncedLocalExams = () =>
+    examHistory.some((e) => typeof e?.id === "string" && e.id.startsWith("local-"));
+
+  function updateSyncedBadgeIfClean() {
+    if (pendingSyncIds.size === 0 && !pendingStatsSync && !hasUnsyncedLocalExams()) {
+      setSyncUI(true, "已同步");
+    }
+  }
+
+  function isEditingNoteInput() {
+    return !!document.activeElement?.matches?.(".js-review-note, #input-personal-note");
+  }
 
   function savePendingFlags() {
-    try {
-      if (pendingSyncIds.size > 0) {
-        localStorage.setItem(cacheKey("pending_sync"), JSON.stringify(Array.from(pendingSyncIds)));
-      } else {
-        localStorage.removeItem(cacheKey("pending_sync"));
-      }
-      if (pendingStatsSync) {
-        localStorage.setItem(cacheKey("pending_stats"), "true");
-      } else {
-        localStorage.removeItem(cacheKey("pending_stats"));
-      }
-    } catch (err) {
-      console.warn("Pending sync flags write warning:", err);
+    if (pendingSyncIds.size > 0) {
+      lsSet(cacheKey("pending_sync"), JSON.stringify(Array.from(pendingSyncIds)));
+    } else {
+      lsRemove(cacheKey("pending_sync"));
+    }
+    if (pendingStatsSync) {
+      lsSet(cacheKey("pending_stats"), "true");
+    } else {
+      lsRemove(cacheKey("pending_stats"));
     }
   }
 
   function loadLocalCache() {
     try {
-      progressMap = JSON.parse(localStorage.getItem(cacheKey("progress")) || "{}");
-      const s = JSON.parse(localStorage.getItem(cacheKey("stats")) || "null");
+      const rawProg = JSON.parse(lsGet(cacheKey("progress")) || "{}");
+      progressMap = rawProg && typeof rawProg === "object" && !Array.isArray(rawProg) ? rawProg : {};
+      const s = JSON.parse(lsGet(cacheKey("stats")) || "null");
       stats = {
-        total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0,
-        ...(s && typeof s === "object" ? s : {})
+        ...DEFAULT_STATS(),
+        ...(s && typeof s === "object" && !Array.isArray(s) ? s : {})
       };
-      examHistory = JSON.parse(localStorage.getItem(cacheKey("exams")) || "[]");
-      const rawPending = JSON.parse(localStorage.getItem(cacheKey("pending_sync")) || "[]");
+      const rawExams = JSON.parse(lsGet(cacheKey("exams")) || "[]");
+      examHistory = Array.isArray(rawExams) ? rawExams.filter((e) => e && typeof e === "object") : [];
+      const rawPending = JSON.parse(lsGet(cacheKey("pending_sync")) || "[]");
       pendingSyncIds = new Set(Array.isArray(rawPending) ? rawPending.filter((id) => typeof id === "string") : []);
-      const rawPendingStats = localStorage.getItem(cacheKey("pending_stats"));
+      const rawPendingStats = lsGet(cacheKey("pending_stats"));
       pendingStatsSync = rawPendingStats === "true" || rawPendingStats === "1";
     } catch (err) {
       console.warn("Local cache reset due to parse error:", err);
       progressMap = {};
+      stats = DEFAULT_STATS();
       examHistory = [];
       pendingSyncIds = new Set();
       pendingStatsSync = false;
@@ -265,13 +411,9 @@
   }
 
   function saveLocalCache() {
-    try {
-      localStorage.setItem(cacheKey("progress"), JSON.stringify(progressMap));
-      localStorage.setItem(cacheKey("stats"), JSON.stringify(stats));
-      localStorage.setItem(cacheKey("exams"), JSON.stringify(examHistory.slice(0, 40)));
-    } catch (err) {
-      console.warn("Local storage quota/write warning:", err);
-    }
+    lsSet(cacheKey("progress"), JSON.stringify(progressMap));
+    lsSet(cacheKey("stats"), JSON.stringify(stats));
+    lsSet(cacheKey("exams"), JSON.stringify(examHistory.slice(0, 40)));
     savePendingFlags();
   }
 
@@ -294,49 +436,82 @@
     }
   }
 
+  function removeRealtimeChannel() {
+    if (db && realtimeChannel) {
+      try {
+        db.removeChannel(realtimeChannel);
+      } catch (err) {
+        console.warn("Realtime unsubscribe warning:", err);
+      }
+    }
+    realtimeChannel = null;
+  }
+
   function subscribeRealtime() {
     if (!db) return;
-    if (realtimeChannel) {
-      db.removeChannel(realtimeChannel);
-      realtimeChannel = null;
-    }
+    removeRealtimeChannel();
+    const subProfile = profileId;
     try {
       realtimeChannel = db
-        .channel(`onetake-prog-${profileId}`)
+        .channel(`onetake-prog-${subProfile}`)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "onetake_progress",
-            filter: `profile_id=eq.${profileId}`
+            filter: `profile_id=eq.${subProfile}`
           },
           (payload) => {
+            if (profileId !== subProfile) return;
             if (payload.eventType === "DELETE") {
+              if (payload.old?.profile_id && payload.old.profile_id !== profileId) return;
               const oldId = payload.old?.question_id;
               if (oldId && progressMap[oldId]) {
                 delete progressMap[oldId];
                 pendingSyncIds.delete(oldId);
                 saveLocalCache();
-                if ($("view-quiz").hidden) renderAll();
+                if ($("view-quiz").hidden) {
+                  renderAll({ preserveNoteInput: true, preserveOpenMistakes: true });
+                }
               }
               return;
             }
             const row = payload.new;
             if (!row || !row.question_id) return;
+            if (row.profile_id && row.profile_id !== profileId) return;
             const local = progressMap[row.question_id];
-            if (!local || new Date(row.updated_at) >= new Date(local.updated_at || 0)) {
+            const rowTs = new Date(row.updated_at || 0).getTime();
+            const localTs = local ? new Date(local.updated_at || 0).getTime() : -Infinity;
+            const isSelfEcho =
+              !!local &&
+              rowTs === localTs &&
+              local.box === row.box &&
+              local.attempts === row.attempts &&
+              (local.mistake_reason || null) === (row.mistake_reason || null) &&
+              (local.personal_note || null) === (row.personal_note || null);
+            if (isSelfEcho) {
+              pendingSyncIds.delete(row.question_id);
+              savePendingFlags();
+              updateSyncedBadgeIfClean();
+              return;
+            }
+            if (!local || rowTs >= localTs) {
               progressMap[row.question_id] = row;
               pendingSyncIds.delete(row.question_id);
               saveLocalCache();
-              if ($("view-quiz").hidden) renderAll();
-              else if (pendingSyncIds.size === 0 && !pendingStatsSync) setSyncUI(true, "已同步");
+              if ($("view-quiz").hidden) {
+                renderAll({ preserveNoteInput: true, preserveOpenMistakes: true });
+              } else {
+                updateSyncedBadgeIfClean();
+              }
             }
           }
         )
         .subscribe();
     } catch (err) {
       console.warn("Realtime subscription unavailable:", err);
+      realtimeChannel = null;
     }
   }
 
@@ -364,33 +539,59 @@
         throw progRes.error || statsRes.error || examRes.error;
       }
 
+      const remoteProg = progRes.data || [];
+      const remoteExams = examRes.data || [];
+      const remoteHasAnyData = remoteProg.length > 0 || !!statsRes.data || remoteExams.length > 0;
+      const hadCloudSync = lsGet(cacheKeyFor(activeProfile, "had_cloud_sync")) === "true";
+
+      if (remoteHasAnyData) {
+        lsSet(cacheKeyFor(activeProfile, "had_cloud_sync"), "true");
+      }
+
       const remoteById = new Map();
-      for (const row of progRes.data || []) remoteById.set(row.question_id, row);
+      for (const row of remoteProg) remoteById.set(row.question_id, row);
 
       const localBeforeMerge = { ...progressMap };
-      const merged = { ...progressMap };
-      for (const row of progRes.data || []) {
-        const local = merged[row.question_id];
-        if (!local || new Date(row.updated_at) >= new Date(local.updated_at || 0)) merged[row.question_id] = row;
-      }
-      progressMap = merged;
-
       const localStatsBeforeMerge = { ...stats };
-      if (statsRes.data) {
-        const useLocalCombo = pendingStatsSync && (localStatsBeforeMerge.total_answered || 0) >= (statsRes.data.total_answered || 0);
-        stats = {
-          total_answered: Math.max(stats.total_answered || 0, statsRes.data.total_answered || 0),
-          total_correct: Math.max(stats.total_correct || 0, statsRes.data.total_correct || 0),
-          best_combo: Math.max(stats.best_combo || 0, statsRes.data.best_combo || 0),
-          current_combo: useLocalCombo ? (localStatsBeforeMerge.current_combo || 0) : (statsRes.data.current_combo || 0),
-          exams_passed: Math.max(stats.exams_passed || 0, statsRes.data.exams_passed || 0),
-          xp: Math.max(stats.xp || 0, statsRes.data.xp || 0)
-        };
+
+      // Safe cross-device reset: only clear non-pending local progress/stats when cloud is completely empty
+      // AND this profile was previously confirmed cloud-synced AND there are no pending local writes.
+      if (!remoteHasAnyData && hadCloudSync && pendingSyncIds.size === 0 && !pendingStatsSync) {
+        progressMap = {};
+        stats = DEFAULT_STATS();
+        lsRemove(cacheKeyFor(activeProfile, "had_cloud_sync"));
+      } else {
+        const merged = { ...progressMap };
+        for (const row of remoteProg) {
+          const local = merged[row.question_id];
+          if (!local || new Date(row.updated_at) >= new Date(local.updated_at || 0)) merged[row.question_id] = row;
+        }
+        progressMap = merged;
+
+        if (statsRes.data) {
+          const localTotal = localStatsBeforeMerge.total_answered || 0;
+          const remoteTotal = statsRes.data.total_answered || 0;
+          const useLocalCombo = localTotal > remoteTotal || (pendingStatsSync && localTotal === remoteTotal);
+          stats = {
+            total_answered: Math.max(stats.total_answered || 0, remoteTotal),
+            total_correct: Math.max(stats.total_correct || 0, statsRes.data.total_correct || 0),
+            best_combo: Math.max(stats.best_combo || 0, statsRes.data.best_combo || 0),
+            current_combo: useLocalCombo ? (localStatsBeforeMerge.current_combo || 0) : (statsRes.data.current_combo || 0),
+            exams_passed: Math.max(stats.exams_passed || 0, statsRes.data.exams_passed || 0),
+            xp: Math.max(stats.xp || 0, statsRes.data.xp || 0)
+          };
+        }
       }
 
       if (examRes.data) {
         const unsyncedLocal = examHistory.filter((e) => typeof e?.id === "string" && e.id.startsWith("local-"));
-        const combined = [...unsyncedLocal, ...examRes.data];
+        const seenIds = new Set();
+        const combined = [];
+        for (const item of [...unsyncedLocal, ...remoteExams]) {
+          if (!item || (item.id && seenIds.has(item.id))) continue;
+          if (item.id) seenIds.add(item.id);
+          combined.push(item);
+        }
         combined.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
         examHistory = combined.slice(0, 40);
       }
@@ -427,15 +628,27 @@
       }
       if (profileId !== activeProfile) return;
 
-      if (pushOk && pendingSyncIds.size === 0 && !pendingStatsSync) {
+      const unsyncedExamsToPush = examHistory.filter(
+        (e) => typeof e?.id === "string" && e.id.startsWith("local-") && !inFlightExamIds.has(e.id)
+      );
+      for (const ex of unsyncedExamsToPush) {
+        const ok = await syncExamRecord(ex, { prepend: false });
+        if (!ok) pushOk = false;
+        if (profileId !== activeProfile) return;
+      }
+
+      if (pushOk && pendingSyncIds.size === 0 && !pendingStatsSync && !hasUnsyncedLocalExams()) {
         setSyncUI(true, "已同步");
       } else {
         setSyncUI(false, "待同步");
       }
-      if (!silent || $("view-quiz").hidden) renderAll();
-      if (!silent) subscribeRealtime();
+      if (!silent || $("view-quiz").hidden) {
+        renderAll({ preserveNoteInput: silent, preserveOpenMistakes: silent });
+      }
+      if (!silent || !realtimeChannel) subscribeRealtime();
     } catch (err) {
       console.warn("Supabase fallback:", err);
+      if (profileId !== activeProfile) return;
       setSyncUI(false, "離線");
     }
   }
@@ -482,13 +695,14 @@
         .upsert(payload, { onConflict: "profile_id,question_id" });
       if (error) throw error;
       if (profileId !== targetProfile) return true;
+      lsSet(cacheKeyFor(targetProfile, "had_cloud_sync"), "true");
       for (const r of uniqueRecs) {
         if (!progressMap[r.question_id] || progressMap[r.question_id].updated_at === r.updated_at) {
           pendingSyncIds.delete(r.question_id);
         }
       }
       savePendingFlags();
-      if (pendingSyncIds.size === 0 && !pendingStatsSync) setSyncUI(true, "已同步");
+      updateSyncedBadgeIfClean();
       return true;
     } catch (err) {
       console.warn("Question progress sync failed:", err);
@@ -519,11 +733,12 @@
       }, { onConflict: "profile_id" });
       if (error) throw error;
       if (profileId !== targetProfile) return true;
+      lsSet(cacheKeyFor(targetProfile, "had_cloud_sync"), "true");
       if (seq === statsSyncSeq) {
         pendingStatsSync = false;
         savePendingFlags();
       }
-      if (pendingSyncIds.size === 0 && !pendingStatsSync) setSyncUI(true, "已同步");
+      updateSyncedBadgeIfClean();
       return true;
     } catch (err) {
       console.warn("Stats sync failed:", err);
@@ -532,36 +747,55 @@
     }
   }
 
-  async function syncExamRecord(examRec) {
+  async function syncExamRecord(examRec, { prepend = true } = {}) {
     const targetProfile = profileId;
-    examHistory.unshift(examRec);
-    saveLocalCache();
+    if (prepend) {
+      examHistory.unshift(examRec);
+      saveLocalCache();
+    }
     if (!db) {
       setSyncUI(false, "待同步");
       return false;
     }
+    const localId = examRec.id;
+    if (typeof localId === "string" && inFlightExamIds.has(localId)) {
+      return true;
+    }
+    if (typeof localId === "string") inFlightExamIds.add(localId);
     try {
-      const { data, error } = await db.from("onetake_exams").insert({
+      const payload = {
         profile_id: targetProfile,
         mode: examRec.mode,
         total_questions: examRec.total_questions,
         correct_count: examRec.correct_count,
         passed: examRec.passed,
         answers: examRec.answers
-      }).select().single();
+      };
+      if (examRec.created_at) payload.created_at = examRec.created_at;
+      const { data, error } = await db.from("onetake_exams").insert(payload).select().single();
       if (error) throw error;
       if (profileId !== targetProfile) return true;
+      lsSet(cacheKeyFor(targetProfile, "had_cloud_sync"), "true");
       if (data) {
-        const idx = examHistory.findIndex((e) => e.id === examRec.id);
-        if (idx !== -1) examHistory[idx] = data;
+        const idx = examHistory.findIndex((e) => e.id === localId);
+        const existingRemoteIdx = examHistory.findIndex((e) => e.id === data.id);
+        if (existingRemoteIdx !== -1 && existingRemoteIdx !== idx) {
+          if (idx !== -1) examHistory.splice(idx, 1);
+        } else if (idx !== -1) {
+          examHistory[idx] = data;
+        } else if (existingRemoteIdx === -1) {
+          examHistory.unshift(data);
+        }
         saveLocalCache();
-        if (pendingSyncIds.size === 0 && !pendingStatsSync) setSyncUI(true, "已同步");
+        updateSyncedBadgeIfClean();
       }
       return true;
     } catch (err) {
       console.warn("Exam record sync failed:", err);
       if (profileId === targetProfile) setSyncUI(false, "待同步");
       return false;
+    } finally {
+      if (typeof localId === "string") inFlightExamIds.delete(localId);
     }
   }
 
@@ -708,12 +942,14 @@
     if (!session) return null;
     const total = session.questions.length;
     const answered = Object.keys(session.answers).length;
-    const right = Object.values(session.answers).filter((a) => a.isRight).length;
+    const right = session.revealAtEnd
+      ? 0
+      : Object.values(session.answers).filter((a) => a.isRight).length;
     return {
       answered,
       total,
       right,
-      combo: session.combo || 0,
+      combo: session.revealAtEnd ? 0 : (session.combo || 0),
       isExam: session.mode === "exam",
       passMin: PASS_MIN,
       revealAtEnd: !!session.revealAtEnd,
@@ -721,24 +957,31 @@
     };
   }
 
-  function syncQuiz3DVisibility() {
+  function syncQuiz3DVisibility({ snap = true } = {}) {
+    const threeReady = has3D();
     const btn = $("btn-toggle-quiz-3d");
     if (btn) {
-      btn.hidden = false;
+      btn.hidden = !threeReady;
       btn.setAttribute("aria-pressed", String(quiz3dOn));
       btn.textContent = quiz3dOn ? "進度車" : "進度車 關";
       btn.title = "顯示或收起 3D 情緒進度條";
     }
     const flatTrack = document.querySelector("#view-quiz .progress-track");
-    if (flatTrack) flatTrack.hidden = quiz3dOn;
+    if (flatTrack) flatTrack.hidden = quiz3dOn && threeReady;
 
     if (!$("view-quiz").hidden) {
-      if (quiz3dOn) {
-        window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
-        const payload = buildQuizProgressPayload({ snap: true });
-        if (payload) window.OneTake3D?.setProgress(payload);
+      if (quiz3dOn && threeReady) {
+        if (mounted3dView !== "quiz") {
+          window.OneTake3D.mount("quiz", { combo: session?.combo || 0 });
+          mounted3dView = "quiz";
+        }
+        const payload = buildQuizProgressPayload({ snap });
+        if (payload) window.OneTake3D.setProgress(payload);
       } else {
-        window.OneTake3D?.mount(null);
+        if (threeReady && mounted3dView !== null) {
+          window.OneTake3D.mount(null);
+        }
+        mounted3dView = null;
       }
     }
   }
@@ -757,11 +1000,17 @@
       else b.removeAttribute("aria-current");
     });
     if (v === "home") {
-      window.OneTake3D?.mount("home");
+      if (has3D()) {
+        window.OneTake3D.mount("home");
+        mounted3dView = "home";
+      } else {
+        mounted3dView = null;
+      }
     } else if (v === "quiz") {
-      syncQuiz3DVisibility();
+      syncQuiz3DVisibility({ snap: true });
     } else if (v !== "summary") {
-      window.OneTake3D?.mount(null);
+      if (has3D()) window.OneTake3D.mount(null);
+      mounted3dView = null;
     }
     window.scrollTo({ top: 0, behavior: "instant" });
   }
@@ -781,6 +1030,7 @@
       return;
     }
     session = { mode, label, questions, revealAtEnd, index: 0, answers: {}, combo: 0, submitted: false };
+    clearDraftSession();
     $("quiz-mode-label").textContent = label;
     $("quiz-dots-panel").hidden = true;
     $("btn-toggle-dots").setAttribute("aria-expanded", "false");
@@ -793,11 +1043,14 @@
     const bar = $("resume-session-bar");
     if (!bar) return;
     const answeredCount = session ? Object.keys(session.answers).length : 0;
-    const resumable = !!session && !session.submitted && answeredCount > 0 && answeredCount < session.questions.length;
+    const resumable = !!session && !session.submitted && answeredCount > 0;
     bar.hidden = !resumable;
     if (!resumable) return;
     $("resume-session-title").textContent = `未完成的${session.label}`;
-    $("resume-session-meta").textContent = `進度：已答 ${answeredCount} / ${session.questions.length} 題（停留於第 ${session.index + 1} 題）`;
+    $("resume-session-meta").textContent =
+      answeredCount === session.questions.length
+        ? `進度：已答 ${answeredCount} / ${session.questions.length} 題（尚未交卷）`
+        : `進度：已答 ${answeredCount} / ${session.questions.length} 題（停留於第 ${session.index + 1} 題）`;
   }
 
   function renderHome() {
@@ -914,6 +1167,7 @@
     dots.querySelectorAll(".q-dot").forEach((d) => {
       d.onclick = () => {
         session.index = Number(d.dataset.qidx);
+        saveDraftSession();
         $("quiz-dots-panel").hidden = true;
         $("btn-toggle-dots").setAttribute("aria-expanded", "false");
         renderCurrentQuestion();
@@ -929,16 +1183,21 @@
 
     const showNow = !!ans && !session.revealAtEnd;
 
+    const threeReady = has3D();
     const quiz3dBtn = $("btn-toggle-quiz-3d");
-    if (quiz3dBtn) quiz3dBtn.hidden = false;
+    if (quiz3dBtn) quiz3dBtn.hidden = !threeReady;
     const flatTrack = document.querySelector("#view-quiz .progress-track");
-    if (flatTrack) flatTrack.hidden = quiz3dOn;
-    if (quiz3dOn) {
-      window.OneTake3D?.mount("quiz", { combo: session?.combo || 0 });
+    if (flatTrack) flatTrack.hidden = quiz3dOn && threeReady;
+    if (quiz3dOn && threeReady) {
+      if (mounted3dView !== "quiz") {
+        window.OneTake3D.mount("quiz", { combo: session?.combo || 0 });
+        mounted3dView = "quiz";
+      }
       const payload = buildQuizProgressPayload({ snap: false });
-      if (payload) window.OneTake3D?.setProgress(payload);
-    } else {
-      window.OneTake3D?.mount(null);
+      if (payload) window.OneTake3D.setProgress(payload);
+    } else if (threeReady && mounted3dView === "quiz") {
+      window.OneTake3D.mount(null);
+      mounted3dView = null;
     }
 
     const visual = $("q-visual");
@@ -1086,7 +1345,7 @@
     } else {
       $("btn-next-q").hidden = !ans || isLast;
       $("btn-submit-exam").hidden = !ans || !isLast;
-      $("btn-submit-exam").textContent = "查看成績";
+      $("btn-submit-exam").textContent = allDone ? "查看成績" : `查看成績（餘 ${total - answered} 題）`;
     }
   }
 
@@ -1109,26 +1368,37 @@
   function renderReflection(qId, prog) {
     updateReflectPreview(prog);
     const chips = $("reason-chips");
-    chips.innerHTML = window.MISTAKE_REASONS.map((r) => {
-      const selected = prog?.mistake_reason === r.id;
-      return `<button type="button" class="reason-chip ${selected ? "is-selected" : ""}" aria-pressed="${selected}" data-reason="${r.id}">${esc(r.label)}</button>`;
-    }).join("");
+    const canTagReason = (prog?.wrong_count || 0) > 0;
+    chips.hidden = !canTagReason;
+    chips.innerHTML = canTagReason
+      ? window.MISTAKE_REASONS.map((r) => {
+          const selected = prog?.mistake_reason === r.id;
+          return `<button type="button" class="reason-chip ${selected ? "is-selected" : ""}" aria-pressed="${selected}" data-reason="${r.id}">${esc(r.label)}</button>`;
+        }).join("")
+      : "";
+    const input = $("input-personal-note");
+    const saveBtn = $("btn-save-note");
+    const hint = $("note-saved-hint");
+
     chips.querySelectorAll(".reason-chip").forEach((c) => {
       c.onclick = async () => {
         if (!progressMap[qId]) return;
         const nextVal = progressMap[qId].mistake_reason === c.dataset.reason ? null : c.dataset.reason;
         progressMap[qId].mistake_reason = nextVal;
         progressMap[qId].updated_at = new Date().toISOString();
+        chips.querySelectorAll(".reason-chip").forEach((b) => {
+          const sel = b.dataset.reason === nextVal;
+          b.classList.toggle("is-selected", sel);
+          b.setAttribute("aria-pressed", String(sel));
+        });
+        updateReflectPreview(progressMap[qId]);
         const synced = await syncQuestionProgress(progressMap[qId]);
-        renderReflection(qId, progressMap[qId]);
-        $("note-saved-hint").textContent = synced ? "已同步" : "已存本機";
-        $("note-saved-hint").hidden = false;
+        if (session?.questions[session.index]?.id !== qId) return;
+        hint.textContent = synced ? "已同步" : "已存本機";
+        hint.hidden = false;
       };
     });
 
-    const input = $("input-personal-note");
-    const saveBtn = $("btn-save-note");
-    const hint = $("note-saved-hint");
     input.value = prog?.personal_note || "";
     hint.hidden = true;
 
@@ -1136,15 +1406,16 @@
       if (!progressMap[qId]) return;
       progressMap[qId].personal_note = input.value.trim();
       progressMap[qId].updated_at = new Date().toISOString();
-      const synced = await syncQuestionProgress(progressMap[qId]);
       updateReflectPreview(progressMap[qId]);
+      const synced = await syncQuestionProgress(progressMap[qId]);
+      if (session?.questions[session.index]?.id !== qId) return;
       hint.textContent = synced ? "已同步" : "已存本機";
       hint.hidden = false;
     };
 
     saveBtn.onclick = saveNote;
     input.onkeydown = (e) => {
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         saveNote();
       }
@@ -1160,6 +1431,7 @@
     const isRight = chosen === q.answer;
     if (session.revealAtEnd) {
       session.answers[idx] = { chosen, isRight };
+      saveDraftSession();
       renderCurrentQuestion();
       return;
     }
@@ -1168,6 +1440,7 @@
     const { updated, wasPreviouslyWrong } = recordAnswer(q.id, chosen, isRight);
     const emotion = pickEmotion({ isRight, combo: session.combo, wasPreviouslyWrong });
     session.answers[idx] = { chosen, isRight, emotion, wasPreviouslyWrong, box: updated.box };
+    saveDraftSession();
 
     if (isRight) {
       playTone(wasPreviouslyWrong ? "redeemed" : "correct", session.combo);
@@ -1176,8 +1449,8 @@
     }
     const answered = Object.keys(session.answers).length;
     const right = Object.values(session.answers).filter((a) => a.isRight).length;
-    if (quiz3dOn) {
-      window.OneTake3D?.reactAnswer({
+    if (quiz3dOn && has3D()) {
+      window.OneTake3D.reactAnswer({
         isRight,
         combo: session.combo,
         wasPreviouslyWrong,
@@ -1197,11 +1470,12 @@
   function finishSession({ force = false } = {}) {
     if (!session || session.submitted) return;
     const total = session.questions.length;
-    if (session.revealAtEnd && !force) {
+    if (!force) {
       const firstUnanswered = session.questions.findIndex((_, i) => !session.answers[i]);
       if (firstUnanswered !== -1) {
         const remaining = total - Object.keys(session.answers).length;
         session.index = firstUnanswered;
+        saveDraftSession();
         renderCurrentQuestion();
         showNotice(`尚有 ${remaining} 題未作答，已跳至第 ${firstUnanswered + 1} 題。`, {
           ctaText: "仍要交卷",
@@ -1212,6 +1486,7 @@
       }
     }
     session.submitted = true;
+    clearDraftSession();
     const batchRecs = [];
     if (session.revealAtEnd) {
       session.questions.forEach((q, i) => {
@@ -1263,9 +1538,14 @@
     syncExamRecord(examRec);
     summaryFilter = "all";
     summarySourceTab = "home";
+    lastSummaryPassed = passed;
     renderSummary(examRec);
     renderAll();
     showView("summary");
+    if (has3D()) {
+      window.OneTake3D.mount("summary", { passed });
+      mounted3dView = "summary";
+    }
   }
 
   // ==================== SUMMARY & UNIFIED REVIEW CARDS ====================
@@ -1273,9 +1553,9 @@
     const { total_questions: total, correct_count: correct, passed, answers } = rec;
     const pct = Math.round((correct / total) * 100);
     const wrongs = answers.filter((a) => !a.isRight);
+    lastSummaryPassed = !!passed;
 
     $("summary-hero").classList.toggle("is-fail", !passed);
-    window.OneTake3D?.mount("summary", { passed });
     $("summary-status-pill").textContent = passed
       ? (rec.mode === "exam" ? "模擬試及格" : "已達標")
       : "未達標";
@@ -1334,6 +1614,9 @@
           const allOpen = items.length > 0 && items.every((d) => d.open);
           expandBtn.textContent = allOpen ? "全部收起" : "展開全部";
         };
+        listEl.querySelectorAll("details.review-item").forEach((d) => {
+          d.addEventListener("toggle", syncExpandText);
+        });
         syncExpandText();
         expandBtn.onclick = () => {
           const items = Array.from(listEl.querySelectorAll("details.review-item"));
@@ -1358,7 +1641,10 @@
     const prog = progressMap[q.id];
     const isWrong = info ? !info.isRight : prog?.last_result === "wrong";
     const chosen = info ? info.chosen : prog?.last_selected_option;
-    const reasonLabel = window.MISTAKE_REASONS.find((r) => r.id === prog?.mistake_reason)?.label;
+    const canTagReason = !!prog && prog.wrong_count > 0;
+    const reasonLabel = canTagReason
+      ? window.MISTAKE_REASONS.find((r) => r.id === prog?.mistake_reason)?.label
+      : "";
 
     let statusHtml = "";
     if (isWrong) {
@@ -1377,7 +1663,7 @@
       })
       .join("");
 
-    const reasonChipsHtml = prog
+    const reasonChipsHtml = canTagReason
       ? `<div class="reason-chips">${window.MISTAKE_REASONS.map((r) => {
           const selected = prog.mistake_reason === r.id;
           return `<button type="button" class="reason-chip js-review-reason ${selected ? "is-selected" : ""}" aria-pressed="${selected}" data-qid="${q.id}" data-reason="${r.id}">${esc(r.label)}</button>`;
@@ -1385,7 +1671,7 @@
       : "";
 
     return `
-      <details class="review-item ${isWrong ? "is-wrong" : "is-right"}" ${openDefault ? "open" : ""}>
+      <details class="review-item ${isWrong ? "is-wrong" : "is-right"}" data-qid="${q.id}" ${openDefault ? "open" : ""}>
         <summary class="review-summary">
           <span class="review-dot" aria-hidden="true"></span>
           ${q.sign && window.SIGN_ASSETS[q.sign] ? `<div class="review-thumb">${window.renderSignImg(q.sign, { thumb: true })}</div>` : ""}
@@ -1394,7 +1680,7 @@
             <div class="review-ans-line">
               ${statusHtml}
               <span class="ans-opt">${esc(q.options[q.answer])}</span>
-              ${reasonLabel ? `<span>· ${esc(reasonLabel)}</span>` : ""}
+              <span class="js-review-reason-tag" data-qid="${q.id}"${reasonLabel ? "" : " hidden"}>${reasonLabel ? `· ${esc(reasonLabel)}` : ""}</span>
             </div>
           </div>
         </summary>
@@ -1408,7 +1694,7 @@
             <blockquote class="source-quote">「${esc(q.source.quote)}」</blockquote>
           </div>
           ${prog ? `<div class="review-note-wrap">
-            <span class="review-note-meta tnum">錯因與筆記 · 對 ${prog.correct_count} / 錯 ${prog.wrong_count}</span>
+            <span class="review-note-meta tnum">${canTagReason ? "錯因與筆記" : "個人筆記"} · 對 ${prog.correct_count} / 錯 ${prog.wrong_count}</span>
             ${reasonChipsHtml}
             <div class="note-row">
               <input type="text" class="text-input js-review-note" data-qid="${q.id}" value="${esc(prog.personal_note || "")}" placeholder="寫低防錯提醒…" maxlength="120" autocomplete="off" aria-label="個人筆記">
@@ -1419,67 +1705,26 @@
       </details>`;
   }
 
-  function bindReviewNotes(container) {
-    container.querySelectorAll(".js-review-reason").forEach((chip) => {
-      chip.onclick = async () => {
-        const qId = chip.dataset.qid;
-        const reasonId = chip.dataset.reason;
-        if (!progressMap[qId]) return;
-        const nextVal = progressMap[qId].mistake_reason === reasonId ? null : reasonId;
-        progressMap[qId].mistake_reason = nextVal;
-        progressMap[qId].updated_at = new Date().toISOString();
-        container.querySelectorAll(`.js-review-reason[data-qid="${qId}"]`).forEach((b) => {
-          const sel = b.dataset.reason === nextVal;
-          b.classList.toggle("is-selected", sel);
-          b.setAttribute("aria-pressed", String(sel));
-        });
-        await syncQuestionProgress(progressMap[qId]);
-      };
+  function getOpenMistakeIds() {
+    const box = $("mistake-list");
+    if (!box) return new Set();
+    const ids = new Set();
+    box.querySelectorAll("details.review-item[open][data-qid]").forEach((d) => {
+      ids.add(d.dataset.qid);
     });
-    container.querySelectorAll(".js-save-review-note").forEach((btn) => {
-      const qId = btn.dataset.qid;
-      const input = container.querySelector(`.js-review-note[data-qid="${qId}"]`);
-      const save = async () => {
-        if (!input || !progressMap[qId]) return;
-        progressMap[qId].personal_note = input.value.trim();
-        progressMap[qId].updated_at = new Date().toISOString();
-        const synced = await syncQuestionProgress(progressMap[qId]);
-        btn.textContent = synced ? "已存" : "本機已存";
-        setTimeout(() => { btn.textContent = "儲存"; }, 1200);
-      };
-      btn.onclick = save;
-      if (input) {
-        input.onkeydown = (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            save();
-          }
-        };
-      }
-    });
+    return ids;
   }
 
-  // ==================== MISTAKE BOOK, CONTRAST & HISTORY ====================
-  function renderMistakeBook() {
-    const counts = [0, 0, 0, 0, 0];
+  function renderMistakeReasonStats(everPool = getAllEverWrong()) {
     const rc = {};
-    for (const q of window.QUESTIONS) {
+    for (const q of everPool) {
       const p = progressMap[q.id];
-      if (!p) continue;
-      if (p.box === 0) counts[0]++;
-      else if (p.box === 1) counts[1]++;
-      else if (p.box === 2) counts[2]++;
-      else if (p.box === 3 || p.box === 4) counts[3]++;
-      else if (p.box >= 5) counts[4]++;
-      if (p.mistake_reason) rc[p.mistake_reason] = (rc[p.mistake_reason] || 0) + 1;
+      if (p?.mistake_reason) rc[p.mistake_reason] = (rc[p.mistake_reason] || 0) + 1;
     }
-    $("leitner-boxes").innerHTML = BOX_META.map(
-      (b, i) => `<div class="lb-cell ${b.cls}"><strong>${counts[i]}</strong><span>${b.title}</span><small>${b.sub}</small></div>`
-    ).join("");
-
     const entries = window.MISTAKE_REASONS.filter((r) => rc[r.id] > 0);
     if (mistakeReasonFilter && !rc[mistakeReasonFilter]) mistakeReasonFilter = null;
     const reasonEl = $("reason-stats");
+    if (!reasonEl) return rc;
     if (entries.length) {
       reasonEl.hidden = false;
       reasonEl.innerHTML = entries
@@ -1498,9 +1743,109 @@
       reasonEl.hidden = true;
       reasonEl.innerHTML = "";
     }
+    return rc;
+  }
+
+  function renderMistakeEmptyState(box) {
+    const msg = mistakeReasonFilter
+      ? "此錯因分類下未有符合錯題。"
+      : mistakeFilter === "active"
+      ? "目前零待擊破錯題。"
+      : "暫無錯題紀錄，先考一卷檢測盲點。";
+    box.innerHTML = `
+      <div class="empty-state">
+        <span>${msg}</span>
+        ${mistakeReasonFilter
+          ? `<button type="button" class="btn btn-secondary btn-sm js-clear-rfilter">清除錯因篩選</button>`
+          : `<button type="button" class="btn btn-primary btn-sm js-empty-launch">開始模擬試</button>`}
+      </div>`;
+    const clearBtn = box.querySelector(".js-clear-rfilter");
+    if (clearBtn) clearBtn.onclick = () => { mistakeReasonFilter = null; renderMistakeBook(); };
+    const btn = box.querySelector(".js-empty-launch");
+    if (btn) btn.onclick = launchExam;
+  }
+
+  function bindReviewNotes(container) {
+    container.querySelectorAll(".js-review-reason").forEach((chip) => {
+      chip.onclick = async () => {
+        const qId = chip.dataset.qid;
+        const reasonId = chip.dataset.reason;
+        if (!progressMap[qId]) return;
+        const nextVal = progressMap[qId].mistake_reason === reasonId ? null : reasonId;
+        progressMap[qId].mistake_reason = nextVal;
+        progressMap[qId].updated_at = new Date().toISOString();
+        container.querySelectorAll(`.js-review-reason[data-qid="${qId}"]`).forEach((b) => {
+          const sel = b.dataset.reason === nextVal;
+          b.classList.toggle("is-selected", sel);
+          b.setAttribute("aria-pressed", String(sel));
+        });
+        const nextLabel = window.MISTAKE_REASONS.find((r) => r.id === nextVal)?.label || "";
+        container.querySelectorAll(`.js-review-reason-tag[data-qid="${qId}"]`).forEach((tag) => {
+          tag.textContent = nextLabel ? `· ${nextLabel}` : "";
+          tag.hidden = !nextLabel;
+        });
+        if (container.id === "mistake-list") {
+          const prevFilter = mistakeReasonFilter;
+          const openIds = getOpenMistakeIds();
+          renderMistakeReasonStats();
+          if (prevFilter) {
+            if (!mistakeReasonFilter) {
+              renderMistakeBook({ preserveOpenIds: openIds });
+            } else if (nextVal !== mistakeReasonFilter) {
+              chip.closest("details.review-item")?.remove();
+              if (!container.querySelector("details.review-item")) {
+                renderMistakeEmptyState(container);
+              }
+            }
+          }
+        }
+        await syncQuestionProgress(progressMap[qId]);
+      };
+    });
+    container.querySelectorAll(".js-save-review-note").forEach((btn) => {
+      const qId = btn.dataset.qid;
+      const input = container.querySelector(`.js-review-note[data-qid="${qId}"]`);
+      const save = async () => {
+        if (!input || !progressMap[qId]) return;
+        progressMap[qId].personal_note = input.value.trim();
+        progressMap[qId].updated_at = new Date().toISOString();
+        const synced = await syncQuestionProgress(progressMap[qId]);
+        btn.textContent = synced ? "已存" : "本機已存";
+        setTimeout(() => { btn.textContent = "儲存"; }, 1200);
+      };
+      btn.onclick = save;
+      if (input) {
+        input.onkeydown = (e) => {
+          if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) {
+            e.preventDefault();
+            save();
+          }
+        };
+      }
+    });
+  }
+
+  // ==================== MISTAKE BOOK, CONTRAST & HISTORY ====================
+  function renderMistakeBook({ preserveOpen = false, preserveOpenIds = null } = {}) {
+    const openIds = preserveOpenIds || (preserveOpen ? getOpenMistakeIds() : null);
+    const counts = [0, 0, 0, 0, 0];
+    for (const q of window.QUESTIONS) {
+      const p = progressMap[q.id];
+      if (!p) continue;
+      if (p.box === 0) counts[0]++;
+      else if (p.box === 1) counts[1]++;
+      else if (p.box === 2) counts[2]++;
+      else if (p.box === 3 || p.box === 4) counts[3]++;
+      else if (p.box >= 5) counts[4]++;
+    }
+    $("leitner-boxes").innerHTML = BOX_META.map(
+      (b, i) => `<div class="lb-cell ${b.cls}"><strong>${counts[i]}</strong><span>${b.title}</span><small>${b.sub}</small></div>`
+    ).join("");
 
     const activePool = getActiveMistakes();
     const everPool = getAllEverWrong();
+    renderMistakeReasonStats(everPool);
+
     const filterCounts = {
       active: activePool.length,
       all: everPool.length,
@@ -1527,25 +1872,10 @@
 
     const box = $("mistake-list");
     if (list.length) {
-      box.innerHTML = list.map((q) => buildReviewCard(q, null, false)).join("");
+      box.innerHTML = list.map((q) => buildReviewCard(q, null, openIds ? openIds.has(q.id) : false)).join("");
       bindReviewNotes(box);
     } else {
-      const msg = mistakeReasonFilter
-        ? "此錯因分類下未有符合錯題。"
-        : mistakeFilter === "active"
-        ? "目前零待擊破錯題。"
-        : "暫無錯題紀錄，先考一卷檢測盲點。";
-      box.innerHTML = `
-        <div class="empty-state">
-          <span>${msg}</span>
-          ${mistakeReasonFilter
-            ? `<button type="button" class="btn btn-secondary btn-sm js-clear-rfilter">清除錯因篩選</button>`
-            : `<button type="button" class="btn btn-primary btn-sm js-empty-launch">開始模擬試</button>`}
-        </div>`;
-      const clearBtn = box.querySelector(".js-clear-rfilter");
-      if (clearBtn) clearBtn.onclick = () => { mistakeReasonFilter = null; renderMistakeBook(); };
-      const btn = box.querySelector(".js-empty-launch");
-      if (btn) btn.onclick = launchExam;
+      renderMistakeEmptyState(box);
     }
   }
 
@@ -1641,15 +1971,22 @@
         if (!rec) return;
         summaryFilter = "all";
         summarySourceTab = "history";
+        lastSummaryPassed = !!rec.passed;
         renderSummary(rec);
         showView("summary");
+        if (has3D()) {
+          window.OneTake3D.mount("summary", { passed: !!rec.passed });
+          mounted3dView = "summary";
+        }
       };
     });
   }
 
-  function renderAll() {
+  function renderAll({ preserveNoteInput = false, preserveOpenMistakes = false } = {}) {
     renderHome();
-    renderMistakeBook();
+    if (!preserveNoteInput || !isEditingNoteInput()) {
+      renderMistakeBook({ preserveOpen: preserveOpenMistakes });
+    }
     renderStudyLab();
     renderHistory();
   }
@@ -1672,8 +2009,12 @@
     $("reset-error-msg").textContent = "";
     const confirmBtn = $("btn-confirm-reset");
     const cancelBtn = $("btn-cancel-reset");
+    const profileInput = $("input-profile-id");
+    const applyBtn = $("btn-apply-profile");
     confirmBtn.disabled = false;
     cancelBtn.disabled = false;
+    if (profileInput) profileInput.disabled = false;
+    if (applyBtn) applyBtn.disabled = false;
     confirmBtn.removeAttribute("aria-busy");
     confirmBtn.textContent = "確認清除全部資料";
   }
@@ -1692,12 +2033,17 @@
   async function clearAllDatabase() {
     if (isResettingDb) return;
     isResettingDb = true;
+    const targetProfile = profileId;
     const confirmBtn = $("btn-confirm-reset");
     const cancelBtn = $("btn-cancel-reset");
+    const profileInput = $("input-profile-id");
+    const applyBtn = $("btn-apply-profile");
     const errEl = $("reset-error-msg");
     errEl.hidden = true;
     confirmBtn.disabled = true;
     cancelBtn.disabled = true;
+    if (profileInput) profileInput.disabled = true;
+    if (applyBtn) applyBtn.disabled = true;
     confirmBtn.setAttribute("aria-busy", "true");
     confirmBtn.textContent = "清除中…";
 
@@ -1708,42 +2054,48 @@
       }
       if (db) {
         const [pDel, eDel, sDel] = await Promise.all([
-          db.from("onetake_progress").delete().eq("profile_id", profileId),
-          db.from("onetake_exams").delete().eq("profile_id", profileId),
-          db.from("onetake_stats").delete().eq("profile_id", profileId)
+          db.from("onetake_progress").delete().eq("profile_id", targetProfile),
+          db.from("onetake_exams").delete().eq("profile_id", targetProfile),
+          db.from("onetake_stats").delete().eq("profile_id", targetProfile)
         ]);
         const err = pDel.error || eDel.error || sDel.error;
         if (err) throw err;
         cloudCleared = true;
       }
 
-      localStorage.removeItem(cacheKey("progress"));
-      localStorage.removeItem(cacheKey("stats"));
-      localStorage.removeItem(cacheKey("exams"));
-      localStorage.removeItem(cacheKey("pending_sync"));
-      localStorage.removeItem(cacheKey("pending_stats"));
-      localStorage.removeItem("onetake_reveal_end");
+      lsRemove(cacheKeyFor(targetProfile, "progress"));
+      lsRemove(cacheKeyFor(targetProfile, "stats"));
+      lsRemove(cacheKeyFor(targetProfile, "exams"));
+      lsRemove(cacheKeyFor(targetProfile, "pending_sync"));
+      lsRemove(cacheKeyFor(targetProfile, "pending_stats"));
+      lsRemove(cacheKeyFor(targetProfile, "had_cloud_sync"));
+      lsRemove("onetake_reveal_end");
+      clearDraftSession(targetProfile);
 
-      progressMap = {};
-      examHistory = [];
-      pendingSyncIds = new Set();
-      pendingStatsSync = false;
-      statsSyncSeq++;
-      stats = { total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0 };
-      session = null;
-      summaryFilter = "all";
-      mistakeFilter = "active";
-      revealAtEndPref = false;
+      if (profileId === targetProfile) {
+        progressMap = {};
+        examHistory = [];
+        pendingSyncIds = new Set();
+        pendingStatsSync = false;
+        inFlightExamIds.clear();
+        statsSyncSeq++;
+        stats = DEFAULT_STATS();
+        session = null;
+        summaryFilter = "all";
+        mistakeFilter = "active";
+        mistakeReasonFilter = null;
+        revealAtEndPref = false;
 
-      setSyncUI(cloudCleared ? true : false, cloudCleared ? "已同步" : "離線");
+        setSyncUI(cloudCleared ? true : false, cloudCleared ? "已同步" : "離線");
+      }
       isResettingDb = false;
       closeSyncModal({ restoreFocus: false, force: true });
       showView("home");
       renderAll();
       showNotice(
         cloudCleared
-          ? `已清除代號「${profileId}」的雲端及本機資料，並還原至初始狀態。`
-          : `已清除代號「${profileId}」的本機資料（目前離線，雲端資料尚未清除）。`
+          ? `已清除代號「${targetProfile}」的雲端及本機資料，並還原至初始狀態。`
+          : `已清除代號「${targetProfile}」的本機資料（目前離線，雲端資料尚未清除）。`
       );
     } catch (err) {
       console.warn("Clear database failed:", err);
@@ -1751,10 +2103,14 @@
       errEl.hidden = false;
       confirmBtn.disabled = false;
       cancelBtn.disabled = false;
+      if (profileInput) profileInput.disabled = false;
+      if (applyBtn) applyBtn.disabled = false;
       confirmBtn.removeAttribute("aria-busy");
       confirmBtn.textContent = "確認清除全部資料";
     } finally {
       isResettingDb = false;
+      if (profileInput) profileInput.disabled = false;
+      if (applyBtn) applyBtn.disabled = false;
     }
   }
 
@@ -1779,8 +2135,10 @@
     resetConfirmUI();
     const target = restoreFocus ? lastFocusedEl : null;
     lastFocusedEl = null;
-    if (target && typeof target.focus === "function") {
-      requestAnimationFrame(() => target.focus({ preventScroll: true }));
+    if (target && target.isConnected && typeof target.focus === "function") {
+      requestAnimationFrame(() => {
+        if (target.isConnected) target.focus({ preventScroll: true });
+      });
     }
   }
 
@@ -1832,15 +2190,24 @@
 
   function closeLightbox({ restoreFocus = true } = {}) {
     const backdrop = $("image-lightbox");
-    if (!backdrop || backdrop.hidden) return;
+    if (!backdrop || backdrop.hidden || backdrop.classList.contains("is-closing")) return;
+    if (lightboxCloseTimer) {
+      clearTimeout(lightboxCloseTimer);
+      lightboxCloseTimer = null;
+    }
     const finish = () => {
       backdrop.hidden = true;
       backdrop.classList.remove("is-closing");
       setLightboxZoom(false);
       const target = restoreFocus ? lightboxTriggerEl : null;
       lightboxTriggerEl = null;
-      if (target && typeof target.focus === "function" && target.isConnected) {
-        requestAnimationFrame(() => target.focus());
+      if (target && target.isConnected) {
+        const focusTarget = target.tabIndex >= 0 ? target : target.closest("summary, button, a");
+        if (focusTarget && typeof focusTarget.focus === "function" && focusTarget.isConnected) {
+          requestAnimationFrame(() => {
+            if (focusTarget.isConnected) focusTarget.focus({ preventScroll: true });
+          });
+        }
       }
     };
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -1855,6 +2222,14 @@
   }
 
   // ==================== THEME, SOUND & EVENTS ====================
+  function isDarkThemeActive() {
+    const root = document.documentElement;
+    const attr = root.getAttribute("data-theme");
+    if (attr === "dark") return true;
+    if (attr === "light") return false;
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+
   function updateThemeColorMeta(isDark) {
     const color = isDark ? "#0B0E13" : "#FAF9F6";
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
@@ -1868,11 +2243,9 @@
 
     if (theme === "dark" || theme === "light") {
       root.setAttribute("data-theme", theme);
-      localStorage.setItem("onetake_theme", theme);
+      lsSet("onetake_theme", theme);
     }
-    const isDark =
-      root.getAttribute("data-theme") === "dark" ||
-      (!root.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const isDark = isDarkThemeActive();
 
     const themeBtn = $("btn-theme");
     themeBtn.innerHTML = isDark ? ICONS.sun : ICONS.moon;
@@ -1895,22 +2268,33 @@
   }
 
   function applyProfileFromModal() {
+    if (isResettingDb) return;
     const raw = $("input-profile-id").value.trim().replace(/[^a-zA-Z0-9_-]/g, "");
     if (!raw) {
       $("sync-status-detail").innerHTML = `<strong style="color:var(--red)">請輸入英數字、底線或連字號作同步代號。</strong>`;
       $("input-profile-id").focus();
       return;
     }
+    const prevProfile = profileId;
+    removeRealtimeChannel();
+    clearDraftSession(prevProfile);
     profileId = raw;
-    localStorage.setItem("onetake_profile", profileId);
+    lsSet("onetake_profile", profileId);
     progressMap = {};
     examHistory = [];
     pendingSyncIds = new Set();
     pendingStatsSync = false;
+    inFlightExamIds.clear();
     statsSyncSeq++;
-    stats = { total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0 };
+    stats = DEFAULT_STATS();
+    session = null;
+    summaryFilter = "all";
+    mistakeFilter = "active";
+    mistakeReasonFilter = null;
     clearNotice();
-    closeSyncModal();
+    const leaveView = !$("view-quiz").hidden || !$("view-summary").hidden;
+    closeSyncModal({ restoreFocus: !leaveView });
+    if (leaveView) showView("home");
     initSupabaseAndLoad();
   }
 
@@ -1921,8 +2305,8 @@
     $("btn-home-brand").onclick = () => { showView("home"); renderHome(); };
     $("btn-stat-mistakes").onclick = () => { showView("mistakes"); renderMistakeBook(); };
 
-    $("seg-instant").onclick = () => { revealAtEndPref = false; localStorage.setItem("onetake_reveal_end", "0"); renderHome(); };
-    $("seg-exam").onclick = () => { revealAtEndPref = true; localStorage.setItem("onetake_reveal_end", "1"); renderHome(); };
+    $("seg-instant").onclick = () => { revealAtEndPref = false; lsSet("onetake_reveal_end", "0"); renderHome(); };
+    $("seg-exam").onclick = () => { revealAtEndPref = true; lsSet("onetake_reveal_end", "1"); renderHome(); };
 
     $("btn-start-exam").onclick = launchExam;
     $("btn-new-exam").onclick = launchExam;
@@ -1936,6 +2320,7 @@
     };
     $("btn-discard-session").onclick = () => {
       session = null;
+      clearDraftSession();
       renderHome();
     };
 
@@ -1967,8 +2352,8 @@
 
     $("btn-toggle-quiz-3d").onclick = () => {
       quiz3dOn = !quiz3dOn;
-      localStorage.setItem("onetake_quiz_3d", quiz3dOn ? "on" : "off");
-      syncQuiz3DVisibility();
+      lsSet("onetake_quiz_3d", quiz3dOn ? "on" : "off");
+      syncQuiz3DVisibility({ snap: true });
     };
 
     $("btn-drill-mistakes-page").onclick = () => {
@@ -1988,8 +2373,8 @@
     };
 
     $("btn-quiz-exit").onclick = () => { showView("home"); renderHome(); };
-    $("btn-prev-q").onclick = () => { if (session && session.index > 0) { session.index--; renderCurrentQuestion(); } };
-    $("btn-next-q").onclick = () => { if (session && session.index < session.questions.length - 1) { session.index++; renderCurrentQuestion(); window.scrollTo({ top: 0, behavior: "smooth" }); } };
+    $("btn-prev-q").onclick = () => { if (session && session.index > 0) { session.index--; saveDraftSession(); renderCurrentQuestion(); } };
+    $("btn-next-q").onclick = () => { if (session && session.index < session.questions.length - 1) { session.index++; saveDraftSession(); renderCurrentQuestion(); window.scrollTo({ top: 0, behavior: "smooth" }); } };
     $("btn-submit-exam").onclick = () => finishSession();
     $("btn-summary-home").onclick = () => { showView("home"); renderHome(); };
 
@@ -2045,6 +2430,7 @@
       }
 
       if ($("view-quiz").hidden || !session) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.keyCode === 229) return;
       if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
       if (document.activeElement?.matches?.("img.sign-img")) return;
       const k = e.key.toUpperCase();
@@ -2053,7 +2439,10 @@
       else if (k === "C" || k === "3") handleOptionSelect("C");
       else if (k === "ARROWLEFT") {
         if (!$("btn-prev-q").hidden) $("btn-prev-q").click();
-      } else if (k === "ENTER" || k === "ARROWRIGHT") {
+      } else if (k === "ARROWRIGHT") {
+        if (!$("btn-next-q").hidden) $("btn-next-q").click();
+      } else if (k === "ENTER") {
+        if (document.activeElement?.closest?.("button, summary, a, [role='button'], [role='radio']")) return;
         if (!$("btn-next-q").hidden) $("btn-next-q").click();
         else if (!$("btn-submit-exam").hidden) $("btn-submit-exam").click();
       }
@@ -2094,7 +2483,7 @@
 
     $("btn-sound").onclick = () => {
       soundOn = !soundOn;
-      localStorage.setItem("onetake_sound", soundOn ? "on" : "off");
+      lsSet("onetake_sound", soundOn ? "on" : "off");
       updateSoundBtn();
       if (soundOn) playTone("correct", 1);
     };
@@ -2104,6 +2493,41 @@
       const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       applyTheme(cur === "dark" || (!cur && sysDark) ? "light" : "dark", { suppressTransitions: true });
     };
+
+    if (window.matchMedia) {
+      const colorSchemeMq = window.matchMedia("(prefers-color-scheme: dark)");
+      const onColorSchemeChange = () => {
+        if (!document.documentElement.hasAttribute("data-theme")) {
+          applyTheme(null);
+        }
+      };
+      if (typeof colorSchemeMq.addEventListener === "function") {
+        colorSchemeMq.addEventListener("change", onColorSchemeChange);
+      } else if (typeof colorSchemeMq.addListener === "function") {
+        colorSchemeMq.addListener(onColorSchemeChange);
+      }
+    }
+
+    const handle3DReady = () => {
+      if (!window.OneTake3D) return;
+      mounted3dView = null;
+      window.OneTake3D.setTheme(isDarkThemeActive());
+      window.OneTake3D.setReadiness(computeReadiness());
+      if (!$("view-home").hidden) {
+        window.OneTake3D.mount("home");
+        mounted3dView = "home";
+      } else if (!$("view-quiz").hidden) {
+        syncQuiz3DVisibility({ snap: true });
+      } else if (!$("view-summary").hidden) {
+        window.OneTake3D.mount("summary", { passed: lastSummaryPassed });
+        mounted3dView = "summary";
+      } else {
+        window.OneTake3D.mount(null);
+        mounted3dView = null;
+      }
+    };
+    window.addEventListener("onetake:3d-ready", handle3DReady);
+    if (window.OneTake3D) handle3DReady();
 
     $("btn-sync").onclick = openSyncModal;
     $("btn-close-modal").onclick = () => closeSyncModal();
@@ -2116,7 +2540,7 @@
     };
     $("btn-confirm-reset").onclick = clearAllDatabase;
     $("input-profile-id").onkeydown = (e) => {
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         applyProfileFromModal();
       }
@@ -2134,8 +2558,9 @@
   }
 
   hydrateIcons();
-  applyTheme(localStorage.getItem("onetake_theme"));
+  applyTheme(lsGet("onetake_theme"));
   updateSoundBtn();
+  restoreDraftSession();
   bindEvents();
   initSupabaseAndLoad();
 })();

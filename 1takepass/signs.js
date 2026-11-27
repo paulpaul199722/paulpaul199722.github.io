@@ -115,6 +115,7 @@
       .join(" ");
     const loading = eager ? "eager" : "lazy";
     const altText = hideAlt ? "題目交通標誌或道路圖解（點擊放大查看）" : item.alt;
-    return `<img class="${cls}" src="${escAttr(item.src)}" alt="${escAttr(altText)}" data-sign-key="${escAttr(key)}" tabindex="0" role="button" aria-label="點擊放大查看圖片" loading="${loading}" decoding="async">`;
+    const interactiveAttrs = thumb ? "" : ` tabindex="0" role="button" aria-label="點擊放大查看圖片"`;
+    return `<img class="${cls}" src="${escAttr(item.src)}" alt="${escAttr(altText)}" data-sign-key="${escAttr(key)}"${interactiveAttrs} loading="${loading}" decoding="async">`;
   };
 })();

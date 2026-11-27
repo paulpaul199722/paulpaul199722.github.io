@@ -33,7 +33,7 @@
       </button>
 
       <nav class="nav-tabs" aria-label="主導覽">
-        <button class="nav-tab is-active" data-tab="home" type="button">練習</button>
+        <button class="nav-tab is-active" data-tab="home" type="button" aria-current="page">練習</button>
         <button class="nav-tab" data-tab="mistakes" type="button">
           <span>錯題</span>
           <span class="nav-badge tnum" id="nav-mistake-badge" hidden>0</span>
@@ -116,7 +116,7 @@
       </section>
 
       <div id="home-3d-slot" class="stage-3d-slot">
-        <div class="stage-3d-shell" id="stage-3d-shell" data-mode="home">
+        <div class="stage-3d-shell" id="stage-3d-shell" data-mode="home" hidden>
           <div class="stage-3d-viewport" id="stage-3d-viewport"></div>
           <div class="stage-3d-top">
             <span class="stage-3d-pill" id="stage-3d-status">3D 模擬車道 · D 波靠左巡航</span>
@@ -204,7 +204,7 @@
         </div>
 
         <div class="dots-drawer" id="quiz-dots-panel" hidden>
-          <div class="q-dots" id="quiz-dots" aria-label="題號跳轉"></div>
+          <div class="q-dots" id="quiz-dots" role="group" aria-label="題號跳轉"></div>
         </div>
       </div>
 
@@ -418,7 +418,7 @@
       </div>
       <div class="lightbox-stage" id="lightbox-stage">
         <div class="lightbox-pad" id="lightbox-pad">
-          <img class="lightbox-img" id="lightbox-img" src="" alt="">
+          <img class="lightbox-img" id="lightbox-img" alt="">
         </div>
       </div>
     </div>

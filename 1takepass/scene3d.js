@@ -65,7 +65,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.domElement.className = "stage-3d-canvas";
   renderer.domElement.setAttribute("aria-label", "1TakePass 互動 3D 香港 P 牌私家車與情緒進度條");
   viewport.appendChild(renderer.domElement);
@@ -132,6 +132,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
             }
           }
           gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
         }
       `
     })
@@ -140,19 +142,28 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   scene.add(skyDome);
 
   // Studio environment reflections via PMREM + RoomEnvironment (shader-cookbook.md)
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const roomEnv = new RoomEnvironment();
-  const envRT = pmrem.fromScene(roomEnv, 0.04);
-  scene.environment = envRT.texture;
+  let envRT = null;
+  function rebuildEnvironment() {
+    if (envRT) {
+      envRT.dispose();
+      envRT = null;
+    }
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const roomEnv = new RoomEnvironment();
+    envRT = pmrem.fromScene(roomEnv, 0.04);
+    scene.environment = envRT.texture;
+    roomEnv.dispose();
+    pmrem.dispose();
+  }
+  rebuildEnvironment();
   scene.environmentIntensity = isDarkTheme() ? 0.52 : 0.85;
-  roomEnv.dispose();
-  pmrem.dispose();
 
   const camera = new THREE.PerspectiveCamera(36, 16 / 9, 0.1, 95);
   camera.position.set(3.4, 2.25, 4.9);
 
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
+  renderer.domElement.style.touchAction = "pan-y";
+  controls.enableDamping = !prefersReducedMotion();
   controls.dampingFactor = 0.07;
   controls.enableZoom = false;
   controls.enablePan = false;
@@ -162,6 +173,13 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   controls.maxAzimuthAngle = Math.PI * 0.48;
   controls.target.set(0, 0.55, -0.3);
   controls.update();
+
+  let isSnappingCamera = false;
+  controls.addEventListener("change", () => {
+    if (!isSnappingCamera && !state.animRunning && !shell.hidden && state.mode) {
+      renderer.render(scene, camera);
+    }
+  });
 
   // ==================== KEY + FILL + RIM LIGHTING RIG (authoring-recipes.md) ====================
   const hemiLight = new THREE.HemisphereLight(0xdaf0ff, 0x7e9485, 0.98);
@@ -1292,9 +1310,13 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   // ==================== STATE ====================
   const LEFT_LANE_X = -1.05;
   const RIGHT_LANE_X = 1.05;
+  const finiteNum = (val, fallback) => {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : fallback;
+  };
 
   const state = {
-    mode: "home", // "home" | "quiz" | "summary"
+    mode: null, // null | "home" | "quiz" | "summary"
     gear: "D",
     lane: "left",
     targetX: LEFT_LANE_X,
@@ -1340,6 +1362,21 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   carRoot.position.set(LEFT_LANE_X, 0, 0.25);
 
   const dummy = new THREE.Object3D();
+  // Pre-allocate sparkInst.instanceColor & hide pooled particles off-screen before compileAsync()
+  dummy.position.set(0, -20, 0);
+  dummy.rotation.set(0, 0, 0);
+  dummy.scale.setScalar(0.001);
+  dummy.updateMatrix();
+  for (let i = 0; i < SPARK_COUNT; i++) {
+    sparkInst.setMatrixAt(i, dummy.matrix);
+    sparkInst.setColorAt(i, confettiPalette[i % confettiPalette.length]);
+  }
+  sparkInst.instanceMatrix.needsUpdate = true;
+  if (sparkInst.instanceColor) sparkInst.instanceColor.needsUpdate = true;
+  for (let i = 0; i < PUFF_COUNT; i++) {
+    puffInst.setMatrixAt(i, dummy.matrix);
+  }
+  puffInst.instanceMatrix.needsUpdate = true;
   const targetBgColor = new THREE.Color();
   const targetSkyTop = new THREE.Color();
   const targetSkyGround = new THREE.Color();
@@ -1407,13 +1444,83 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
   function wakeQuizAnim(seconds = 1.25) {
     if (state.mode !== "quiz") return;
-    state.quizWakeTimer = Math.max(state.quizWakeTimer, seconds);
     if (prefersReducedMotion()) {
+      state.quizWakeTimer = 0;
       snapQuizProgressImmediate();
       renderSingleFrame();
       return;
     }
+    state.quizWakeTimer = Math.max(state.quizWakeTimer, seconds);
     startLoopIfAllowed();
+  }
+
+  function hasPendingQuizMotion() {
+    if (state.mode !== "quiz") return false;
+    const anyMilestonePopping = milestoneGems.some((m) => m.popT > 0);
+    return (
+      Math.abs(carRoot.position.x - state.targetX) >= 0.004 ||
+      Math.abs(state.carVelX) >= 0.02 ||
+      state.hopPhase > 0 ||
+      state.squashTimer > 0 ||
+      state.brakeTimer > 0 ||
+      state.hazardTimer > 0 ||
+      state.flashTimer > 0 ||
+      state.wobbleTimer > 0 ||
+      state.rimFlashTimer > 0 ||
+      state.popTimer > 0 ||
+      anyMilestonePopping ||
+      hasActiveSparks() ||
+      hasActivePuffs() ||
+      state.quizWakeTimer > 0
+    );
+  }
+
+  function resetTransientEffects() {
+    state.quizWakeTimer = 0;
+    state.popTimer = 0;
+    state.boostTimer = 0;
+    state.brakeTimer = 0;
+    state.hazardTimer = 0;
+    state.blinkerTimer = 0;
+    state.blinkerDir = 0;
+    state.wobbleTimer = 0;
+    state.flashTimer = 0;
+    state.rimFlashTimer = 0;
+    state.hopPhase = 0;
+    state.squashTimer = 0;
+    state.carVelX = 0;
+
+    emotionPopSprite.visible = false;
+    popMat.opacity = 0;
+
+    dummy.position.set(0, -20, 0);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.setScalar(0.001);
+    dummy.updateMatrix();
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      sparks[i].active = false;
+      sparks[i].life = 0;
+      sparkInst.setMatrixAt(i, dummy.matrix);
+    }
+    sparkInst.instanceMatrix.needsUpdate = true;
+    for (let i = 0; i < PUFF_COUNT; i++) {
+      puffs[i].active = false;
+      puffs[i].life = 0;
+      puffInst.setMatrixAt(i, dummy.matrix);
+    }
+    puffInst.instanceMatrix.needsUpdate = true;
+
+    for (const m of milestoneGems) {
+      m.popT = 0;
+      m.gem.scale.setScalar(1);
+    }
+
+    carBodyGroup.position.set(0, 0, 0);
+    carBodyGroup.scale.setScalar(1);
+    carBodyGroup.rotation.set(0, 0, 0);
+    shadowBlob.scale.setScalar(1);
+    shadowBlob.material.opacity = 1;
+    ribbonUniforms.uPulseBoost.value = 0.0;
   }
 
   function snapQuizProgressImmediate() {
@@ -1456,12 +1563,14 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       const nowReached = curPct >= m.pct - 0.015;
       if (nowReached && !m.reached) {
         m.reached = true;
-        m.popT = 0.55;
-        emitSparks(10, 0x34d399, m.x, 0.42, -0.68);
+        if (!prefersReducedMotion()) {
+          m.popT = 0.55;
+          emitSparks(10, 0x34d399, m.x, 0.42, -0.68);
+        }
       }
       if (!nowReached) m.reached = false;
-      if (m.popT > 0 && dt > 0) {
-        m.popT = Math.max(0, m.popT - dt);
+      if (m.popT > 0) {
+        if (dt > 0) m.popT = Math.max(0, m.popT - dt);
         const k = 1 - m.popT / 0.55;
         const sc = 0.75 + 0.52 * easeOutBack(k);
         m.gem.scale.setScalar(sc);
@@ -1486,7 +1595,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   function setGear(g) {
     if (!["P", "R", "N", "D"].includes(g)) return;
     state.gear = g;
-    if (g === "P") state.brakeTimer = 0.55;
+    if (g === "P" && !prefersReducedMotion()) state.brakeTimer = 0.55;
     updateHudUI();
     if (prefersReducedMotion()) renderSingleFrame();
   }
@@ -1496,31 +1605,45 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     const next = state.lane === "left" ? "right" : "left";
     state.lane = next;
     state.targetX = next === "left" ? LEFT_LANE_X : RIGHT_LANE_X;
-    state.blinkerDir = next === "left" ? -1 : 1;
-    state.blinkerTimer = 1.5;
+    if (prefersReducedMotion()) {
+      carRoot.position.x = state.targetX;
+    } else {
+      state.blinkerDir = next === "left" ? -1 : 1;
+      state.blinkerTimer = 1.5;
+    }
     updateHudUI();
     if (prefersReducedMotion()) renderSingleFrame();
   }
 
   function triggerHonkBoost() {
-    state.hopPhase = 1.0;
-    state.squashKind = "jump";
-    state.squashTimer = 0.38;
-    state.squashDuration = 0.38;
-    state.flashTimer = 0.45;
-    state.rimFlashTimer = 0.5;
-    state.rimFlashHex = 0x38bdf8;
-    if (state.mode === "home" && state.gear === "D") state.boostTimer = 0.9;
-    emitSparks(14, null);
+    const reduced = prefersReducedMotion();
+    if (!reduced) {
+      state.hopPhase = 1.0;
+      state.squashKind = "jump";
+      state.squashTimer = 0.38;
+      state.squashDuration = 0.38;
+      state.flashTimer = 0.45;
+      state.rimFlashTimer = 0.5;
+      state.rimFlashHex = 0x38bdf8;
+      if (state.mode === "home" && state.gear === "D") state.boostTimer = 0.9;
+      emitSparks(14, null);
+    }
     if (typeof window.playOneTakeHorn === "function") window.playOneTakeHorn();
     if (state.mode === "quiz") {
-      emitExhaustPuffs(4, false);
-      showEmotionPop("📣 呠呠！加油！", "honk");
+      if (!reduced) {
+        emitExhaustPuffs(4, false);
+        showEmotionPop("📣 呠呠！加油！", "honk");
+      }
       state.quizMoodText = "呠呠！深呼吸一下，你一定 1 Take Pass！";
       state.quizMoodTone = "streak";
       updateHudUI();
-      wakeQuizAnim(1.3);
-    } else if (prefersReducedMotion()) {
+      if (reduced) {
+        snapQuizProgressImmediate();
+        renderSingleFrame();
+      } else {
+        wakeQuizAnim(1.3);
+      }
+    } else if (reduced) {
       renderSingleFrame();
     }
   }
@@ -1531,11 +1654,20 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
   let downX = 0;
   let downY = 0;
+  let activePointerId = null;
   renderer.domElement.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) {
+      activePointerId = null;
+      return;
+    }
+    activePointerId = e.pointerId;
     downX = e.clientX;
     downY = e.clientY;
   });
   renderer.domElement.addEventListener("pointerup", (e) => {
+    if (activePointerId === null || e.pointerId !== activePointerId) return;
+    activePointerId = null;
+    if (e.button !== 0) return;
     if (Math.hypot(e.clientX - downX, e.clientY - downY) > 7) return;
     const rect = renderer.domElement.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
@@ -1547,6 +1679,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     if (raycaster.intersectObjects(pickables, false).length > 0) {
       triggerHonkBoost();
     }
+  });
+  renderer.domElement.addEventListener("pointercancel", (e) => {
+    if (e.pointerId === activePointerId) activePointerId = null;
   });
   renderer.domElement.addEventListener("pointermove", (e) => {
     if (e.buttons !== 0) return;
@@ -1565,6 +1700,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   function fitQuizProgressCamera() {
     const halfW = 7.75; // frames Start -> HK Skyline -> 16/20 -> 1✓ PASS edge-to-edge on desktop & mobile!
     const halfH = 1.24; // comfortably clears floating 3D emotion sticker above car!
+    isSnappingCamera = true;
     camera.fov = 26;
     const tanHalfV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const tanHalfH = tanHalfV * Math.max(1.5, camera.aspect);
@@ -1572,15 +1708,20 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     camera.position.set(0, camZ * 0.14 + 0.54, camZ);
     controls.target.set(0, 0.66, -0.35);
     controls.enabled = false;
+    renderer.domElement.style.touchAction = "pan-y";
     camera.updateProjectionMatrix();
     controls.update();
+    isSnappingCamera = false;
   }
 
   function snapCameraForMode(mode) {
+    controls.enableDamping = !prefersReducedMotion();
     if (mode === "quiz") {
       fitQuizProgressCamera();
       return;
-    } else if (mode === "summary") {
+    }
+    isSnappingCamera = true;
+    if (mode === "summary") {
       camera.fov = 36;
       camera.updateProjectionMatrix();
       camera.position.set(3.2, 2.05, 4.1);
@@ -1593,22 +1734,37 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       controls.target.set(-0.2, 0.55, -0.4);
       controls.enabled = true;
     }
+    renderer.domElement.style.touchAction = "pan-y";
     controls.update();
+    isSnappingCamera = false;
   }
+
+  let lastW = 0;
+  let lastH = 0;
+  let lastDpr = 0;
 
   function resizeRenderer() {
     const w = viewport.clientWidth;
     const h = viewport.clientHeight;
-    if (w < 10 || h < 10) return;
+    if (w < 10 || h < 10) return false;
+    const dpr = Math.min(window.devicePixelRatio || 1, isMobileScreen() ? 1.75 : 2);
+    if (w === lastW && h === lastH && dpr === lastDpr) return false;
+    lastW = w;
+    lastH = h;
+    lastDpr = dpr;
+    renderer.setPixelRatio(dpr);
     camera.aspect = w / h;
     if (state.mode === "quiz") fitQuizProgressCamera();
     else camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
-    renderSingleFrame();
+    if (state.animRunning) renderer.render(scene, camera);
+    else if (state.mode && !shell.hidden) renderSingleFrame();
+    return true;
   }
 
   const resizeObserver = new ResizeObserver(() => resizeRenderer());
   resizeObserver.observe(viewport);
+  window.addEventListener("resize", resizeRenderer);
 
   function mountToView(mode, opts = {}) {
     state.hasExternalMount = true;
@@ -1616,6 +1772,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       mode === "quiz" ? "quiz-3d-slot" : mode === "summary" ? "summary-3d-slot" : mode === "home" ? "home-3d-slot" : null;
 
     if (!slotId) {
+      resetTransientEffects();
+      state.mode = null;
       shell.hidden = true;
       pauseLoop();
       return;
@@ -1625,10 +1783,49 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     if (!slot) return;
 
     const changedMode = state.mode !== mode;
+    const sameSlot = shell.parentElement === slot;
+    const wasHidden = shell.hidden;
+
+    if (!changedMode && sameSlot && !wasHidden) {
+      if (mode === "quiz") {
+        if (opts && opts.combo !== undefined) state.combo = Math.max(0, finiteNum(opts.combo, 0));
+        updateHudUI();
+        resizeRenderer();
+        if (hasPendingQuizMotion()) startLoopIfAllowed();
+        return;
+      }
+      if (mode === "summary" && state.summaryPassed === (opts.passed !== false)) {
+        updateHudUI();
+        resizeRenderer();
+        startLoopIfAllowed();
+        return;
+      }
+      if (mode === "home") {
+        updateHudUI();
+        resizeRenderer();
+        startLoopIfAllowed();
+        return;
+      }
+    }
+
+    if (changedMode) {
+      resetTransientEffects();
+    }
+
     state.mode = mode;
     shell.dataset.mode = mode;
     shell.hidden = false;
-    if (shell.parentElement !== slot) slot.appendChild(shell);
+    if (!sameSlot) slot.appendChild(shell);
+    if (wasHidden || !sameSlot) {
+      const rect = shell.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        state.isVisible =
+          rect.bottom > 0 &&
+          rect.top < (window.innerHeight || document.documentElement.clientHeight) &&
+          rect.right > 0 &&
+          rect.left < (window.innerWidth || document.documentElement.clientWidth);
+      }
+    }
 
     if (mode === "home") {
       homeWorldGroup.visible = true;
@@ -1667,8 +1864,10 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       trophyRingMat.emissive.setHex(state.summaryPassed ? 0x059669 : 0xb45309);
       trophyStar.visible = state.summaryPassed;
       streakAura.material.opacity = 0;
-      if (state.summaryPassed) emitSparks(28, null);
-      else state.hazardTimer = 2.0;
+      if (!prefersReducedMotion()) {
+        if (state.summaryPassed) emitSparks(28, null);
+        else state.hazardTimer = 2.0;
+      }
     } else if (mode === "quiz") {
       homeWorldGroup.visible = false;
       progressTrackGroup.visible = true;
@@ -1680,34 +1879,44 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
       carRoot.rotation.set(0, -Math.PI / 2, 0);
       carBodyGroup.rotation.set(0, 0, 0);
       carRoot.position.z = 0.04;
-      state.combo = opts.combo || 0;
+      state.combo = Math.max(0, finiteNum(opts.combo, 0));
       if (changedMode) {
         state.quizPassedNotified = false;
         state.quizMoodTone = "neutral";
         state.quizMoodText = pickDefaultMoodText();
         state.carVelX = 0;
-        carRoot.position.x = TRACK_MIN_X + TRACK_SPAN * state.progressRatio;
+        state.targetX = TRACK_MIN_X + TRACK_SPAN * state.progressRatio;
+        carRoot.position.x = state.targetX;
+        for (const m of milestoneGems) {
+          m.reached = state.progressRatio >= m.pct - 0.015;
+          m.popT = 0;
+          m.gem.scale.setScalar(1);
+        }
       }
       updateProgressTrackVisuals(0);
     }
 
     if (changedMode || mode === "summary") snapCameraForMode(mode);
     updateHudUI();
-    resizeRenderer();
 
     if (mode === "quiz") {
-      if (state.quizWakeTimer > 0) startLoopIfAllowed();
-      else {
+      if (hasPendingQuizMotion()) {
+        resizeRenderer();
+        startLoopIfAllowed();
+      } else {
         pauseLoop();
-        renderSingleFrame();
+        const didResize = resizeRenderer();
+        if (!didResize) renderSingleFrame();
       }
     } else {
-      startLoopIfAllowed();
+      const didResize = resizeRenderer();
+      if (!didResize && prefersReducedMotion()) renderSingleFrame();
+      else startLoopIfAllowed();
     }
   }
 
   // ==================== PUBLIC API FOR app.js ====================
-  window.OneTake3D = {
+  const api = {
     mount: mountToView,
     supportsQuestion() {
       return true;
@@ -1715,26 +1924,30 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     setTheme(dark) {
       state.isDark = !!dark;
       applyThemeColors(1);
-      renderSingleFrame();
+      if (!state.animRunning && state.mode && !shell.hidden) renderSingleFrame();
     },
     setReadiness(pct) {
-      state.readiness = Math.max(0, Math.min(100, Number(pct) || 0));
+      state.readiness = Math.max(0, Math.min(100, finiteNum(pct, 0)));
     },
     setProgress({ answered = 0, total = 20, right = 0, combo = 0, isExam = false, passMin = 16, revealAtEnd = false, snap = false } = {}) {
-      const safeTotal = Math.max(1, total);
-      const nextRatio = THREE.MathUtils.clamp(answered / safeTotal, 0, 1);
+      const safeTotal = Math.max(1, finiteNum(total, 20));
+      const safeAnswered = Math.max(0, finiteNum(answered, 0));
+      const safeRight = Math.max(0, finiteNum(right, 0));
+      const safeCombo = Math.max(0, finiteNum(combo, 0));
+      const safePassMin = Math.max(1, finiteNum(passMin, 16));
+      const nextRatio = THREE.MathUtils.clamp(safeAnswered / safeTotal, 0, 1);
       const moved = Math.abs(nextRatio - state.progressRatio) > 0.001;
-      state.quizAnswered = answered;
+      state.quizAnswered = safeAnswered;
       state.quizTotal = safeTotal;
-      state.quizRight = right;
-      state.combo = combo;
+      state.quizRight = safeRight;
+      state.combo = safeCombo;
       state.quizIsExam = !!isExam;
-      state.quizPassMin = passMin;
+      state.quizPassMin = safePassMin;
       state.quizRevealAtEnd = !!revealAtEnd;
       state.progressRatio = nextRatio;
       state.targetX = TRACK_MIN_X + TRACK_SPAN * nextRatio;
 
-      if (answered === 0) {
+      if (safeAnswered === 0) {
         state.quizPassedNotified = false;
         state.quizMoodTone = "neutral";
         state.quizMoodText = pickDefaultMoodText();
@@ -1755,80 +1968,107 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         punchElement(hudSpeed);
         wakeQuizAnim(1.1);
       } else {
-        updateProgressTrackVisuals(0);
         updateHudUI();
-        if (!state.animRunning) renderSingleFrame();
+        if (!state.animRunning) {
+          updateProgressTrackVisuals(0);
+          renderSingleFrame();
+        }
       }
     },
-    reactAnswer({ isRight, combo = 0, wasPreviouslyWrong = false, answered = 1, total = 20, right = 0, isExam = false, passMin = 16, emotion = null }) {
-      const safeTotal = Math.max(1, total);
-      state.quizAnswered = answered;
+    reactAnswer({ isRight, combo = 0, wasPreviouslyWrong = false, answered = 1, total = 20, right = 0, isExam = false, passMin = 16, emotion = null } = {}) {
+      const safeTotal = Math.max(1, finiteNum(total, 20));
+      const safeAnswered = Math.max(0, finiteNum(answered, 1));
+      const safeRight = Math.max(0, finiteNum(right, 0));
+      const safeCombo = Math.max(0, finiteNum(combo, 0));
+      const safePassMin = Math.max(1, finiteNum(passMin, 16));
+      const reduced = prefersReducedMotion();
+
+      state.quizAnswered = safeAnswered;
       state.quizTotal = safeTotal;
-      state.quizRight = right;
-      state.combo = isRight ? combo : 0;
+      state.quizRight = safeRight;
+      state.combo = isRight ? safeCombo : 0;
       state.quizIsExam = !!isExam;
-      state.quizPassMin = passMin;
-      state.progressRatio = THREE.MathUtils.clamp(answered / safeTotal, 0, 1);
+      state.quizPassMin = safePassMin;
+      state.progressRatio = THREE.MathUtils.clamp(safeAnswered / safeTotal, 0, 1);
       state.targetX = TRACK_MIN_X + TRACK_SPAN * state.progressRatio;
 
-      const justPassedExam = isExam && isRight && right >= passMin && !state.quizPassedNotified;
+      const justPassedExam = !state.quizRevealAtEnd && isExam && isRight && safeRight >= safePassMin && !state.quizPassedNotified;
       if (justPassedExam) state.quizPassedNotified = true;
 
       if (isRight) {
-        state.hopPhase = 1.0;
-        state.squashKind = "jump";
-        state.squashTimer = 0.42;
-        state.squashDuration = 0.42;
-        state.flashTimer = 0.5;
-        state.brakeTimer = 0;
-        state.hazardTimer = 0;
-        state.rimFlashTimer = 0.72;
-        emitExhaustPuffs(5, combo >= 3 || justPassedExam);
+        if (!reduced) {
+          state.hopPhase = 1.0;
+          state.squashKind = "jump";
+          state.squashTimer = 0.42;
+          state.squashDuration = 0.42;
+          state.flashTimer = 0.5;
+          state.brakeTimer = 0;
+          state.hazardTimer = 0;
+          state.rimFlashTimer = 0.72;
+          emitExhaustPuffs(5, safeCombo >= 3 || justPassedExam);
+        }
 
         if (justPassedExam) {
-          state.rimFlashHex = 0xfacc15;
           state.quizMoodTone = "passed";
-          state.quizMoodText = `衝過及格線（${right}/${passMin}）！1 Take Pass 喺望！`;
-          showEmotionPop("🏆 過咗及格線！", "passed");
-          emitSparks(32, null, passArchX, 1.15, -0.35);
-          emitSparks(16, null);
+          state.quizMoodText = `衝過及格線（${safeRight}/${safePassMin}）！1 Take Pass 喺望！`;
+          if (!reduced) {
+            state.rimFlashHex = 0xfacc15;
+            showEmotionPop("🏆 過咗及格線！", "passed");
+            emitSparks(32, null, passArchX, 1.15, -0.35);
+            emitSparks(16, null);
+          }
         } else if (wasPreviouslyWrong) {
-          state.rimFlashHex = 0x10b981;
           state.quizMoodTone = "right";
           state.quizMoodText = emotion?.text || "錯題擊破！越嚟越穩陣！";
-          showEmotionPop("🎯 錯題擊破！", "right");
-          emitSparks(24, null);
-        } else if (combo >= 3) {
-          state.rimFlashHex = 0xf59e0b;
+          if (!reduced) {
+            state.rimFlashHex = 0x10b981;
+            showEmotionPop("🎯 錯題擊破！", "right");
+            emitSparks(24, null);
+          }
+        } else if (safeCombo >= 3) {
           state.quizMoodTone = "streak";
           const raw = emotion?.text || "手風超順，繼續衝！";
-          state.quizMoodText = /連中/.test(raw) ? raw : `${combo} 連中！${raw}`;
-          showEmotionPop(`🔥 ${combo} 連中！`, "streak");
-          emitSparks(22, null);
+          state.quizMoodText = /連中/.test(raw) ? raw : `${safeCombo} 連中！${raw}`;
+          if (!reduced) {
+            state.rimFlashHex = 0xf59e0b;
+            showEmotionPop(`🔥 ${safeCombo} 連中！`, "streak");
+            emitSparks(22, null);
+          }
         } else {
-          state.rimFlashHex = 0x10b981;
           state.quizMoodTone = "right";
           state.quizMoodText = emotion?.text || "穩陣！又向 1 Take Pass 行前一步！";
-          showEmotionPop("✨ 穩陣 +1", "right");
-          emitSparks(16, null);
+          if (!reduced) {
+            state.rimFlashHex = 0x10b981;
+            showEmotionPop("✨ 穩陣 +1", "right");
+            emitSparks(16, null);
+          }
         }
       } else {
-        state.squashKind = "brake";
-        state.squashTimer = 0.34;
-        state.squashDuration = 0.34;
-        state.brakeTimer = 0.85;
-        state.hazardTimer = 1.05;
-        state.wobbleTimer = 0.52;
-        state.rimFlashTimer = 0.55;
-        state.rimFlashHex = 0xf59e0b;
         state.quizMoodTone = "wrong";
         state.quizMoodText = emotion?.text || "唔緊要，考前踩一踩停記低好過考場錯！";
-        showEmotionPop("💪 記低下次贏", "wrong");
+        if (!reduced) {
+          state.squashKind = "brake";
+          state.squashTimer = 0.34;
+          state.squashDuration = 0.34;
+          state.brakeTimer = 0.85;
+          state.hazardTimer = 1.05;
+          state.wobbleTimer = 0.52;
+          state.rimFlashTimer = 0.55;
+          state.rimFlashHex = 0xf59e0b;
+          showEmotionPop("💪 記低下次贏", "wrong");
+        }
       }
 
       updateHudUI();
       punchElement(hudSpeed);
-      if (state.mode === "quiz") wakeQuizAnim(1.35);
+      if (state.mode === "quiz") {
+        if (reduced) {
+          snapQuizProgressImmediate();
+          renderSingleFrame();
+        } else {
+          wakeQuizAnim(1.35);
+        }
+      }
     },
     _debugState() {
       return {
@@ -1867,7 +2107,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     if (state.mode === "quiz") {
       // Emotional Sky Journey: crisp HK morning (0%) -> warm Golden Hour Victoria Harbour sunset (80-100%)!
       const sunsetMix = THREE.MathUtils.clamp((state.progressRatio - 0.35) / 0.55, 0, 1);
-      const isStreakOrPass = (!state.quizRevealAtEnd && state.combo >= 3) || (state.quizIsExam && state.quizRight >= state.quizPassMin);
+      const isStreakOrPass = !state.quizRevealAtEnd && (state.combo >= 3 || (state.quizIsExam && state.quizRight >= state.quizPassMin));
       const warmAmt = Math.min(1, sunsetMix + (isStreakOrPass ? 0.35 : 0));
 
       if (dark) {
@@ -2106,7 +2346,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
         const popAlpha = k > 0.78 ? Math.max(0, 1 - (k - 0.78) / 0.22) : 1.0;
         const clampedX = THREE.MathUtils.clamp(carRoot.position.x, TRACK_MIN_X + 0.6, TRACK_MAX_X - 0.6);
         emotionPopSprite.visible = popAlpha > 0.02;
-        emotionPopSprite.position.set(clampedX, 1.38 + easeOutCubic(Math.min(1, k * 1.6)) * 0.24, 0.35);
+        emotionPopSprite.position.set(clampedX, 1.28 + easeOutCubic(Math.min(1, k * 1.6)) * 0.20, 0.35);
         emotionPopSprite.scale.set(2.3 * popScale, 0.68 * popScale, 1);
         popMat.opacity = popAlpha;
       } else {
@@ -2129,23 +2369,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
       // Auto-sleep render loop once glide + spring + pop-up + confetti settle completely!
       if (state.quizWakeTimer > 0) state.quizWakeTimer = Math.max(0, state.quizWakeTimer - dt);
-      const anyMilestonePopping = milestoneGems.some((m) => m.popT > 0);
-      const settled =
-        Math.abs(carRoot.position.x - state.targetX) < 0.004 &&
-        Math.abs(state.carVelX) < 0.02 &&
-        state.hopPhase <= 0 &&
-        state.squashTimer <= 0 &&
-        state.brakeTimer <= 0 &&
-        state.hazardTimer <= 0 &&
-        state.flashTimer <= 0 &&
-        state.wobbleTimer <= 0 &&
-        state.rimFlashTimer <= 0 &&
-        state.popTimer <= 0 &&
-        !anyMilestonePopping &&
-        !hasActiveSparks() &&
-        !hasActivePuffs() &&
-        state.quizWakeTimer <= 0;
-      if (settled && state.animRunning) {
+      if (!hasPendingQuizMotion() && state.animRunning) {
         carBodyGroup.position.y = 0;
         carBodyGroup.scale.setScalar(1);
         carBodyGroup.rotation.set(0, 0, 0);
@@ -2166,7 +2390,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     } else if (state.gear === "R") desiredSpeed = -2.4;
     else if (state.gear === "N") desiredSpeed = 0.6;
 
-    state.roadSpeed = THREE.MathUtils.damp(state.roadSpeed, desiredSpeed, 4.8, dt);
+    const reduced = prefersReducedMotion();
+    state.roadSpeed = reduced ? desiredSpeed : THREE.MathUtils.damp(state.roadSpeed, desiredSpeed, 4.8, dt);
     state.roadOffset = (state.roadOffset + state.roadSpeed * dt) % 10000;
 
     const roadTexV = -(state.roadOffset / roadLen) * 11;
@@ -2237,21 +2462,23 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     gantry.position.z = gz;
 
     const prevX = carRoot.position.x;
-    carRoot.position.x = THREE.MathUtils.damp(carRoot.position.x, state.targetX, 5.2, dt);
-    const latVel = dt > 0.0001 ? (carRoot.position.x - prevX) / dt : 0;
+    carRoot.position.x = reduced ? state.targetX : THREE.MathUtils.damp(carRoot.position.x, state.targetX, 5.2, dt);
+    const latVel = !reduced && dt > 0.0001 ? (carRoot.position.x - prevX) / dt : 0;
     const steerAngle = THREE.MathUtils.clamp(-latVel * 0.18, -0.34, 0.34);
-    for (const fp of frontWheelPivots) fp.rotation.y = THREE.MathUtils.damp(fp.rotation.y, steerAngle, 10, dt);
+    for (const fp of frontWheelPivots) {
+      fp.rotation.y = reduced ? 0 : THREE.MathUtils.damp(fp.rotation.y, steerAngle, 10, dt);
+    }
 
     const wheelDelta = (state.roadSpeed * dt) / wheelRadius;
     for (const ws of wheelSpinners) ws.rotation.x -= wheelDelta;
 
-    const hopY = Math.sin(state.hopPhase * Math.PI) * 0.15;
-    const engineVib = Math.sin(elapsed * (state.roadSpeed !== 0 ? 18 : 11)) * (state.gear === "P" ? 0.003 : 0.008);
+    const hopY = reduced ? 0 : Math.sin(state.hopPhase * Math.PI) * 0.15;
+    const engineVib = reduced ? 0 : Math.sin(elapsed * (state.roadSpeed !== 0 ? 18 : 11)) * (state.gear === "P" ? 0.003 : 0.008);
     carBodyGroup.position.y = hopY + engineVib;
     carBodyGroup.scale.setScalar(1);
-    carBodyGroup.rotation.z = THREE.MathUtils.damp(carBodyGroup.rotation.z, -latVel * 0.072, 7.5, dt);
+    carBodyGroup.rotation.z = reduced ? 0 : THREE.MathUtils.damp(carBodyGroup.rotation.z, -latVel * 0.072, 7.5, dt);
     const targetPitch = state.brakeTimer > 0 && Math.abs(state.roadSpeed) > 0.3 ? -0.065 : state.boostTimer > 0 ? 0.05 : 0;
-    carBodyGroup.rotation.x = THREE.MathUtils.damp(carBodyGroup.rotation.x, targetPitch, 8.5, dt);
+    carBodyGroup.rotation.x = reduced ? 0 : THREE.MathUtils.damp(carBodyGroup.rotation.x, targetPitch, 8.5, dt);
 
     const braking = state.brakeTimer > 0 || state.gear === "P";
     brakeLightMat.emissiveIntensity = braking ? 3.0 : state.isDark ? 0.95 : 0.3;
@@ -2274,12 +2501,13 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
     stepSparksAndPuffs(dt);
 
-    controls.autoRotate = state.mode === "summary";
+    controls.autoRotate = !reduced && state.mode === "summary";
     controls.autoRotateSpeed = 1.1;
-    controls.update(dt);
+    if (!reduced) controls.update(dt);
   }
 
   function renderSingleFrame() {
+    if (!state.mode || shell.hidden) return;
     stepScene(0, 0);
     renderer.render(scene, camera);
   }
@@ -2293,7 +2521,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   }
 
   function startLoopIfAllowed() {
-    if (shell.hidden || !state.isVisible || document.hidden) return;
+    if (!state.mode || shell.hidden || !state.isVisible || document.hidden) return;
     if (prefersReducedMotion()) {
       renderSingleFrame();
       return;
@@ -2315,9 +2543,9 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   const io = new IntersectionObserver(
     (entries) => {
       state.isVisible = entries.some((e) => e.isIntersecting);
-      if (state.isVisible) {
+      if (state.isVisible && state.mode && !shell.hidden) {
         if (state.mode === "quiz") {
-          if (state.quizWakeTimer > 0) startLoopIfAllowed();
+          if (hasPendingQuizMotion()) startLoopIfAllowed();
           else renderSingleFrame();
         } else {
           startLoopIfAllowed();
@@ -2331,22 +2559,56 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   io.observe(shell);
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) pauseLoop();
-    else if (state.mode !== "quiz" || state.quizWakeTimer > 0) startLoopIfAllowed();
+    if (document.hidden) {
+      pauseLoop();
+    } else if (state.mode && !shell.hidden && state.isVisible) {
+      if (state.mode === "quiz") {
+        if (hasPendingQuizMotion()) startLoopIfAllowed();
+        else renderSingleFrame();
+      } else {
+        startLoopIfAllowed();
+      }
+    }
   });
+
+  const darkMql = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+  if (darkMql && typeof darkMql.addEventListener === "function") {
+    darkMql.addEventListener("change", () => {
+      if (document.documentElement.hasAttribute("data-theme")) return;
+      state.isDark = isDarkTheme();
+      applyThemeColors(1);
+      if (!state.animRunning && state.mode && !shell.hidden) renderSingleFrame();
+    });
+  }
 
   renderer.domElement.addEventListener("webglcontextlost", (e) => {
     e.preventDefault();
     pauseLoop();
   });
   renderer.domElement.addEventListener("webglcontextrestored", () => {
-    if (state.mode === "quiz") renderSingleFrame();
-    else startLoopIfAllowed();
+    rebuildEnvironment();
+    lastW = 0;
+    lastH = 0;
+    lastDpr = 0;
+    if (!state.mode || shell.hidden) return;
+    const didResize = resizeRenderer();
+    if (state.mode === "quiz") {
+      if (hasPendingQuizMotion()) startLoopIfAllowed();
+      else if (!didResize) renderSingleFrame();
+    } else {
+      startLoopIfAllowed();
+    }
   });
 
   Promise.resolve(renderer.compileAsync ? renderer.compileAsync(scene, camera) : null)
     .catch(() => {})
     .finally(() => {
-      if (!state.hasExternalMount) mountToView("home");
+      state.isDark = isDarkTheme();
+      applyThemeColors(1);
+      window.OneTake3D = api;
+      window.dispatchEvent(new CustomEvent("onetake:3d-ready"));
+      if (!state.hasExternalMount && !document.getElementById("view-home")?.hidden) {
+        mountToView("home");
+      }
     });
 })();
