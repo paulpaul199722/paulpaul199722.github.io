@@ -50,6 +50,9 @@
   let progressMap = {};
   let stats = { total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0 };
   let examHistory = [];
+  let pendingSyncIds = new Set();
+  let pendingStatsSync = false;
+  let statsSyncSeq = 0;
   let syncState = { ok: null, text: "同步中" };
 
   let session = null;
@@ -222,16 +225,42 @@
   // ==================== STORAGE & SUPABASE ====================
   const cacheKey = (k) => `onetake_${profileId}_${k}`;
 
+  function savePendingFlags() {
+    try {
+      if (pendingSyncIds.size > 0) {
+        localStorage.setItem(cacheKey("pending_sync"), JSON.stringify(Array.from(pendingSyncIds)));
+      } else {
+        localStorage.removeItem(cacheKey("pending_sync"));
+      }
+      if (pendingStatsSync) {
+        localStorage.setItem(cacheKey("pending_stats"), "true");
+      } else {
+        localStorage.removeItem(cacheKey("pending_stats"));
+      }
+    } catch (err) {
+      console.warn("Pending sync flags write warning:", err);
+    }
+  }
+
   function loadLocalCache() {
     try {
       progressMap = JSON.parse(localStorage.getItem(cacheKey("progress")) || "{}");
       const s = JSON.parse(localStorage.getItem(cacheKey("stats")) || "null");
-      if (s) stats = { ...stats, ...s };
+      stats = {
+        total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0,
+        ...(s && typeof s === "object" ? s : {})
+      };
       examHistory = JSON.parse(localStorage.getItem(cacheKey("exams")) || "[]");
+      const rawPending = JSON.parse(localStorage.getItem(cacheKey("pending_sync")) || "[]");
+      pendingSyncIds = new Set(Array.isArray(rawPending) ? rawPending.filter((id) => typeof id === "string") : []);
+      const rawPendingStats = localStorage.getItem(cacheKey("pending_stats"));
+      pendingStatsSync = rawPendingStats === "true" || rawPendingStats === "1";
     } catch (err) {
       console.warn("Local cache reset due to parse error:", err);
       progressMap = {};
       examHistory = [];
+      pendingSyncIds = new Set();
+      pendingStatsSync = false;
     }
   }
 
@@ -243,6 +272,7 @@
     } catch (err) {
       console.warn("Local storage quota/write warning:", err);
     }
+    savePendingFlags();
   }
 
   function setSyncUI(ok, text) {
@@ -286,6 +316,7 @@
               const oldId = payload.old?.question_id;
               if (oldId && progressMap[oldId]) {
                 delete progressMap[oldId];
+                pendingSyncIds.delete(oldId);
                 saveLocalCache();
                 if ($("view-quiz").hidden) renderAll();
               }
@@ -296,9 +327,10 @@
             const local = progressMap[row.question_id];
             if (!local || new Date(row.updated_at) >= new Date(local.updated_at || 0)) {
               progressMap[row.question_id] = row;
+              pendingSyncIds.delete(row.question_id);
               saveLocalCache();
               if ($("view-quiz").hidden) renderAll();
-              else setSyncUI(true, "已同步");
+              else if (pendingSyncIds.size === 0 && !pendingStatsSync) setSyncUI(true, "已同步");
             }
           }
         )
@@ -309,6 +341,7 @@
   }
 
   async function initSupabaseAndLoad({ silent = false } = {}) {
+    const activeProfile = profileId;
     if (!silent) {
       loadLocalCache();
       renderAll();
@@ -322,14 +355,19 @@
       if (!silent) setSyncUI(null, "同步中");
       lastSyncFetchAt = Date.now();
       const [progRes, statsRes, examRes] = await Promise.all([
-        db.from("onetake_progress").select("*").eq("profile_id", profileId),
-        db.from("onetake_stats").select("*").eq("profile_id", profileId).maybeSingle(),
-        db.from("onetake_exams").select("*").eq("profile_id", profileId).order("created_at", { ascending: false }).limit(30)
+        db.from("onetake_progress").select("*").eq("profile_id", activeProfile),
+        db.from("onetake_stats").select("*").eq("profile_id", activeProfile).maybeSingle(),
+        db.from("onetake_exams").select("*").eq("profile_id", activeProfile).order("created_at", { ascending: false }).limit(30)
       ]);
+      if (profileId !== activeProfile) return;
       if (progRes.error || statsRes.error || examRes.error) {
         throw progRes.error || statsRes.error || examRes.error;
       }
 
+      const remoteById = new Map();
+      for (const row of progRes.data || []) remoteById.set(row.question_id, row);
+
+      const localBeforeMerge = { ...progressMap };
       const merged = { ...progressMap };
       for (const row of progRes.data || []) {
         const local = merged[row.question_id];
@@ -337,19 +375,63 @@
       }
       progressMap = merged;
 
+      const localStatsBeforeMerge = { ...stats };
       if (statsRes.data) {
+        const useLocalCombo = pendingStatsSync && (localStatsBeforeMerge.total_answered || 0) >= (statsRes.data.total_answered || 0);
         stats = {
           total_answered: Math.max(stats.total_answered || 0, statsRes.data.total_answered || 0),
           total_correct: Math.max(stats.total_correct || 0, statsRes.data.total_correct || 0),
           best_combo: Math.max(stats.best_combo || 0, statsRes.data.best_combo || 0),
-          current_combo: statsRes.data.current_combo || 0,
+          current_combo: useLocalCombo ? (localStatsBeforeMerge.current_combo || 0) : (statsRes.data.current_combo || 0),
           exams_passed: Math.max(stats.exams_passed || 0, statsRes.data.exams_passed || 0),
           xp: Math.max(stats.xp || 0, statsRes.data.xp || 0)
         };
       }
-      if (examRes.data) examHistory = examRes.data;
+
+      if (examRes.data) {
+        const unsyncedLocal = examHistory.filter((e) => typeof e?.id === "string" && e.id.startsWith("local-"));
+        const combined = [...unsyncedLocal, ...examRes.data];
+        combined.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        examHistory = combined.slice(0, 40);
+      }
+
+      // Safe retry: push back ONLY explicitly tracked pending_sync items whose local row is newer than remote or missing remotely
+      const pendingToPush = [];
+      for (const qId of Array.from(pendingSyncIds)) {
+        const local = localBeforeMerge[qId];
+        if (!local) {
+          pendingSyncIds.delete(qId);
+          continue;
+        }
+        const remote = remoteById.get(qId);
+        const localTs = new Date(local.updated_at || 0).getTime();
+        const remoteTs = remote ? new Date(remote.updated_at || 0).getTime() : -Infinity;
+        if (!remote || localTs > remoteTs) {
+          pendingToPush.push(local);
+        } else {
+          pendingSyncIds.delete(qId);
+        }
+      }
+
       saveLocalCache();
-      setSyncUI(true, "已同步");
+
+      let pushOk = true;
+      if (pendingToPush.length > 0) {
+        const ok = await syncQuestionProgressBatch(pendingToPush);
+        if (!ok) pushOk = false;
+      }
+      if (profileId !== activeProfile) return;
+      if (pendingStatsSync) {
+        const ok = await syncStats();
+        if (!ok) pushOk = false;
+      }
+      if (profileId !== activeProfile) return;
+
+      if (pushOk && pendingSyncIds.size === 0 && !pendingStatsSync) {
+        setSyncUI(true, "已同步");
+      } else {
+        setSyncUI(false, "待同步");
+      }
       if (!silent || $("view-quiz").hidden) renderAll();
       if (!silent) subscribeRealtime();
     } catch (err) {
@@ -358,59 +440,109 @@
     }
   }
 
-  async function syncQuestionProgress(rec) {
+  function toProgressPayload(rec, targetProfile = profileId) {
+    return {
+      profile_id: targetProfile,
+      question_id: rec.question_id,
+      attempts: rec.attempts,
+      correct_count: rec.correct_count,
+      wrong_count: rec.wrong_count,
+      box: rec.box,
+      streak: rec.streak,
+      last_result: rec.last_result,
+      last_selected_option: rec.last_selected_option,
+      mistake_reason: rec.mistake_reason || null,
+      personal_note: rec.personal_note || null,
+      next_review_at: rec.next_review_at,
+      last_answered_at: rec.last_answered_at,
+      updated_at: rec.updated_at
+    };
+  }
+
+  async function syncQuestionProgressBatch(recs) {
+    const list = Array.isArray(recs) ? recs.filter((r) => r && r.question_id) : [];
+    if (!list.length) return true;
+
+    const byId = new Map();
+    for (const r of list) byId.set(r.question_id, r);
+    const uniqueRecs = Array.from(byId.values());
+
+    const targetProfile = profileId;
+    for (const r of uniqueRecs) pendingSyncIds.add(r.question_id);
     saveLocalCache();
-    if (!db) return false;
+
+    if (!db) {
+      setSyncUI(false, "待同步");
+      return false;
+    }
     try {
-      const { error } = await db.from("onetake_progress").upsert({
-        profile_id: profileId,
-        question_id: rec.question_id,
-        attempts: rec.attempts,
-        correct_count: rec.correct_count,
-        wrong_count: rec.wrong_count,
-        box: rec.box,
-        streak: rec.streak,
-        last_result: rec.last_result,
-        last_selected_option: rec.last_selected_option,
-        mistake_reason: rec.mistake_reason || null,
-        personal_note: rec.personal_note || null,
-        next_review_at: rec.next_review_at,
-        last_answered_at: rec.last_answered_at,
-        updated_at: rec.updated_at
-      }, { onConflict: "profile_id,question_id" });
+      const payload = uniqueRecs.map((r) => toProgressPayload(r, targetProfile));
+      const { error } = await db
+        .from("onetake_progress")
+        .upsert(payload, { onConflict: "profile_id,question_id" });
       if (error) throw error;
-      setSyncUI(true, "已同步");
+      if (profileId !== targetProfile) return true;
+      for (const r of uniqueRecs) {
+        if (!progressMap[r.question_id] || progressMap[r.question_id].updated_at === r.updated_at) {
+          pendingSyncIds.delete(r.question_id);
+        }
+      }
+      savePendingFlags();
+      if (pendingSyncIds.size === 0 && !pendingStatsSync) setSyncUI(true, "已同步");
       return true;
     } catch (err) {
       console.warn("Question progress sync failed:", err);
-      setSyncUI(false, "待同步");
+      if (profileId === targetProfile) setSyncUI(false, "待同步");
       return false;
     }
   }
 
+  async function syncQuestionProgress(rec) {
+    if (!rec) return false;
+    return syncQuestionProgressBatch([rec]);
+  }
+
   async function syncStats() {
+    const targetProfile = profileId;
+    const seq = ++statsSyncSeq;
+    pendingStatsSync = true;
     saveLocalCache();
-    if (!db) return;
+    if (!db) {
+      setSyncUI(false, "待同步");
+      return false;
+    }
     try {
       const { error } = await db.from("onetake_stats").upsert({
-        profile_id: profileId,
+        profile_id: targetProfile,
         ...stats,
         updated_at: new Date().toISOString()
       }, { onConflict: "profile_id" });
       if (error) throw error;
+      if (profileId !== targetProfile) return true;
+      if (seq === statsSyncSeq) {
+        pendingStatsSync = false;
+        savePendingFlags();
+      }
+      if (pendingSyncIds.size === 0 && !pendingStatsSync) setSyncUI(true, "已同步");
+      return true;
     } catch (err) {
       console.warn("Stats sync failed:", err);
-      setSyncUI(false, "待同步");
+      if (profileId === targetProfile) setSyncUI(false, "待同步");
+      return false;
     }
   }
 
   async function syncExamRecord(examRec) {
+    const targetProfile = profileId;
     examHistory.unshift(examRec);
     saveLocalCache();
-    if (!db) return;
+    if (!db) {
+      setSyncUI(false, "待同步");
+      return false;
+    }
     try {
       const { data, error } = await db.from("onetake_exams").insert({
-        profile_id: profileId,
+        profile_id: targetProfile,
         mode: examRec.mode,
         total_questions: examRec.total_questions,
         correct_count: examRec.correct_count,
@@ -418,21 +550,26 @@
         answers: examRec.answers
       }).select().single();
       if (error) throw error;
+      if (profileId !== targetProfile) return true;
       if (data) {
-        examHistory[0] = data;
+        const idx = examHistory.findIndex((e) => e.id === examRec.id);
+        if (idx !== -1) examHistory[idx] = data;
         saveLocalCache();
-        setSyncUI(true, "已同步");
+        if (pendingSyncIds.size === 0 && !pendingStatsSync) setSyncUI(true, "已同步");
       }
+      return true;
     } catch (err) {
       console.warn("Exam record sync failed:", err);
-      setSyncUI(false, "待同步");
+      if (profileId === targetProfile) setSyncUI(false, "待同步");
+      return false;
     }
   }
 
   // ==================== SRS LOGIC ====================
+  const isMastered = (p) => (p?.box || 0) >= 2;
   const nextReviewIso = (box) => new Date(Date.now() + (BOX_INTERVAL_HOURS[box] ?? 24) * 3600000).toISOString();
 
-  function recordAnswer(qId, chosenOption, isRight) {
+  function recordAnswer(qId, chosenOption, isRight, { sync = true } = {}) {
     const nowIso = new Date().toISOString();
     const prev = progressMap[qId] || {
       profile_id: profileId, question_id: qId,
@@ -441,7 +578,12 @@
       mistake_reason: null, personal_note: null
     };
     const wasPreviouslyWrong = prev.wrong_count > 0 && (prev.last_result === "wrong" || prev.box <= 1);
-    const nextBox = isRight ? Math.min(5, (prev.box === 0 ? 1 : prev.box) + 1) : 0;
+    let nextBox = 0;
+    if (isRight) {
+      if (prev.attempts === 0) nextBox = 2;
+      else if (prev.box === 0) nextBox = 1;
+      else nextBox = Math.min(5, prev.box + 1);
+    }
 
     const updated = {
       ...prev,
@@ -469,8 +611,10 @@
       stats.xp = (stats.xp || 0) + 3;
     }
 
-    syncQuestionProgress(updated);
-    syncStats();
+    if (sync) {
+      syncQuestionProgress(updated);
+      syncStats();
+    }
     return { updated, wasPreviouslyWrong };
   }
 
@@ -485,7 +629,7 @@
   const getActiveMistakes = () =>
     window.QUESTIONS.filter((q) => {
       const p = progressMap[q.id];
-      return p && p.wrong_count > 0 && (p.box <= 1 || p.last_result === "wrong");
+      return p && p.wrong_count > 0 && (p.box === 0 || p.last_result === "wrong");
     });
 
   const getAllEverWrong = () => window.QUESTIONS.filter((q) => progressMap[q.id]?.wrong_count > 0);
@@ -549,7 +693,9 @@
       if (new Date(p.next_review_at).getTime() <= now) return 2.8 + Math.random(); // due for SRS
       return (5 - p.box) * 0.35 + Math.random(); // low mastery before fully mastered
     };
-    return shuffle([...qs].sort((a, b) => score(b) - score(a)).slice(0, limit));
+    const scored = qs.map((q) => ({ q, s: score(q) }));
+    scored.sort((a, b) => b.s - a.s);
+    return shuffle(scored.slice(0, limit).map((item) => item.q));
   }
 
   function buildMockExam() {
@@ -657,7 +803,8 @@
   function renderHome() {
     renderResumeBar();
     const total = window.QUESTIONS.length;
-    const mastered = window.QUESTIONS.filter((q) => (progressMap[q.id]?.box || 0) >= 3).length;
+    const mastered = window.QUESTIONS.filter((q) => isMastered(progressMap[q.id])).length;
+    const reviewedMastered = window.QUESTIONS.filter((q) => (progressMap[q.id]?.box || 0) >= 3).length;
     const activeMistakes = getActiveMistakes();
     const dueCount = Math.max(getDueQuestions().length, activeMistakes.length);
     const readiness = computeReadiness();
@@ -666,7 +813,12 @@
     $("readiness-bar-fill").style.transform = `scaleX(${(readiness / 100).toFixed(4)})`;
     window.OneTake3D?.setReadiness(readiness);
 
-    $("stat-mastered").textContent = `${mastered} / ${total}`;
+    const masteredEl = $("stat-mastered");
+    const masteredTip = `已答對並鞏固的題目（Box 2+；其中 複習熟手 Box 3+：${reviewedMastered} 題）`;
+    masteredEl.textContent = `${mastered} / ${total}`;
+    masteredEl.title = masteredTip;
+    const masteredItem = $("stat-item-mastered") || masteredEl.closest(".stat-item");
+    if (masteredItem) masteredItem.title = masteredTip;
     $("stat-exams-passed").textContent = `${stats.exams_passed || 0} 次`;
     $("stat-active-mistakes").textContent = String(activeMistakes.length);
     $("btn-stat-mistakes").classList.toggle("has-mistakes", activeMistakes.length > 0);
@@ -691,7 +843,7 @@
     const grid = $("chapter-grid");
     grid.innerHTML = window.CATEGORIES.map((cat) => {
       const qs = window.QUESTIONS.filter((q) => q.category === cat.id);
-      const done = qs.filter((q) => (progressMap[q.id]?.box || 0) >= 2).length;
+      const done = qs.filter((q) => isMastered(progressMap[q.id])).length;
       const err = qs.filter((q) => progressMap[q.id]?.box === 0).length;
       const ratio = qs.length ? done / qs.length : 0;
       return `
@@ -849,7 +1001,10 @@
 
       const statusEl = $("explain-status");
       if (ans.isRight && ans.wasPreviouslyWrong) {
-        statusEl.textContent = "答對 · 錯題已掌握";
+        const achievedBox = ans.box ?? progressMap[q.id]?.box ?? 0;
+        statusEl.textContent = achievedBox === 1
+          ? "答對 · 錯題已清除（10 分鐘後再確認）"
+          : "答對 · 錯題已熟習";
         statusEl.className = "explain-status is-redeemed";
       } else if (ans.isRight) {
         statusEl.textContent = "答對";
@@ -1010,9 +1165,9 @@
     }
 
     session.combo = isRight ? session.combo + 1 : 0;
-    const { wasPreviouslyWrong } = recordAnswer(q.id, chosen, isRight);
+    const { updated, wasPreviouslyWrong } = recordAnswer(q.id, chosen, isRight);
     const emotion = pickEmotion({ isRight, combo: session.combo, wasPreviouslyWrong });
-    session.answers[idx] = { chosen, isRight, emotion, wasPreviouslyWrong };
+    session.answers[idx] = { chosen, isRight, emotion, wasPreviouslyWrong, box: updated.box };
 
     if (isRight) {
       playTone(wasPreviouslyWrong ? "redeemed" : "correct", session.combo);
@@ -1057,12 +1212,16 @@
       }
     }
     session.submitted = true;
+    const batchRecs = [];
     if (session.revealAtEnd) {
       session.questions.forEach((q, i) => {
         const a = session.answers[i];
         const chosen = a ? a.chosen : null;
         const isRight = chosen === q.answer;
-        if (chosen) recordAnswer(q.id, chosen, isRight);
+        if (chosen) {
+          const { updated } = recordAnswer(q.id, chosen, isRight, { sync: false });
+          batchRecs.push(updated);
+        }
         session.answers[i] = { chosen: chosen || "未答", isRight };
       });
     }
@@ -1075,15 +1234,25 @@
     const pct = Math.round((correctCount / total) * 100);
     const passed = total === EXAM_LEN ? correctCount >= PASS_MIN : pct >= 80;
 
+    let needStatsSync = batchRecs.length > 0;
     if (passed) {
-      stats.exams_passed = (stats.exams_passed || 0) + 1;
-      syncStats();
+      if (session.mode === "exam") {
+        stats.exams_passed = (stats.exams_passed || 0) + 1;
+        needStatsSync = true;
+      }
       playTone("pass");
       burstConfetti(44);
     }
 
+    if (batchRecs.length > 0) {
+      syncQuestionProgressBatch(batchRecs);
+    }
+    if (needStatsSync) {
+      syncStats();
+    }
+
     const examRec = {
-      id: `local-${Date.now()}`,
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       mode: session.mode,
       total_questions: total,
       correct_count: correctCount,
@@ -1108,7 +1277,7 @@
     $("summary-hero").classList.toggle("is-fail", !passed);
     window.OneTake3D?.mount("summary", { passed });
     $("summary-status-pill").textContent = passed
-      ? (total === EXAM_LEN ? "模擬試及格" : "已達標")
+      ? (rec.mode === "exam" ? "模擬試及格" : "已達標")
       : "未達標";
     $("summary-score-title").textContent = `${correct} / ${total}（${pct}%）`;
     $("summary-message").textContent =
@@ -1293,19 +1462,21 @@
   // ==================== MISTAKE BOOK, CONTRAST & HISTORY ====================
   function renderMistakeBook() {
     const counts = [0, 0, 0, 0, 0];
-    Object.values(progressMap).forEach((p) => {
+    const rc = {};
+    for (const q of window.QUESTIONS) {
+      const p = progressMap[q.id];
+      if (!p) continue;
       if (p.box === 0) counts[0]++;
       else if (p.box === 1) counts[1]++;
       else if (p.box === 2) counts[2]++;
       else if (p.box === 3 || p.box === 4) counts[3]++;
       else if (p.box >= 5) counts[4]++;
-    });
+      if (p.mistake_reason) rc[p.mistake_reason] = (rc[p.mistake_reason] || 0) + 1;
+    }
     $("leitner-boxes").innerHTML = BOX_META.map(
       (b, i) => `<div class="lb-cell ${b.cls}"><strong>${counts[i]}</strong><span>${b.title}</span><small>${b.sub}</small></div>`
     ).join("");
 
-    const rc = {};
-    Object.values(progressMap).forEach((p) => { if (p.mistake_reason) rc[p.mistake_reason] = (rc[p.mistake_reason] || 0) + 1; });
     const entries = window.MISTAKE_REASONS.filter((r) => rc[r.id] > 0);
     if (mistakeReasonFilter && !rc[mistakeReasonFilter]) mistakeReasonFilter = null;
     const reasonEl = $("reason-stats");
@@ -1549,10 +1720,15 @@
       localStorage.removeItem(cacheKey("progress"));
       localStorage.removeItem(cacheKey("stats"));
       localStorage.removeItem(cacheKey("exams"));
+      localStorage.removeItem(cacheKey("pending_sync"));
+      localStorage.removeItem(cacheKey("pending_stats"));
       localStorage.removeItem("onetake_reveal_end");
 
       progressMap = {};
       examHistory = [];
+      pendingSyncIds = new Set();
+      pendingStatsSync = false;
+      statsSyncSeq++;
       stats = { total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0 };
       session = null;
       summaryFilter = "all";
@@ -1729,6 +1905,9 @@
     localStorage.setItem("onetake_profile", profileId);
     progressMap = {};
     examHistory = [];
+    pendingSyncIds = new Set();
+    pendingStatsSync = false;
+    statsSyncSeq++;
     stats = { total_answered: 0, total_correct: 0, best_combo: 0, current_combo: 0, exams_passed: 0, xp: 0 };
     clearNotice();
     closeSyncModal();
